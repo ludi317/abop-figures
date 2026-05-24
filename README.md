@@ -1,9 +1,17 @@
+
+
+
+
+
 # abop-figures
 
 Interactive recreations of figures from *The Algorithmic Beauty of
 Plants* (Prusinkiewicz & Lindenmayer, 1990). Each file is a single
 self-contained HTML page using p5.js. No build, no dependencies
 beyond a browser.
+
+https://github.com/user-attachments/assets/f95d1623-46b7-4375-bbf5-4ae967b4453c
+
 
 ## Running
 
