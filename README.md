@@ -3,6 +3,9 @@
 
 
 
+
+
+
 # abop-figures
 
 Interactive recreations of figures from *The Algorithmic Beauty of
@@ -11,6 +14,8 @@ self-contained HTML page using p5.js. No build, no dependencies
 beyond a browser.
 
 https://github.com/user-attachments/assets/f95d1623-46b7-4375-bbf5-4ae967b4453c
+
+https://github.com/user-attachments/assets/be5e3e88-9b3a-43ab-99f5-092b4874c5db
 
 
 ## Running
