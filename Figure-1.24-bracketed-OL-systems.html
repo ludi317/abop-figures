@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>L-system plants (figure 1.24)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 320px; z-index: 10;
+    }
+    #panel h3 { margin: 0 0 8px; font-size: 14px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .row label { width: 64px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row input[type=text] { flex: 1; font-family: monospace; font-size: 12px; padding: 3px 5px; }
+    .row .val { width: 44px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 10px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+    #panel .hint { color:#888; font-size: 11px; margin-top:6px; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 1.24 — bracketed OL-systems</h3>
+  <div class="row"><label>axiom</label><input type="text" id="axiom" value="F"></div>
+  <div class="row"><label>F →</label><input type="text" id="ruleF" value="F[+F]F[-F]F"></div>
+  <div class="row"><label>X →</label><input type="text" id="ruleX" value=""></div>
+  <div class="row"><label>n</label><input type="range" id="N" min="0" max="9" step="1" value="5"><span class="val" id="Nv">5</span></div>
+  <div class="row"><label>δ°</label><input type="range" id="DELTA" min="5" max="90" step="0.1" value="25.7"><span class="val" id="DELTAv">25.7</span></div>
+  <div class="presets">
+    presets:
+    <button data-p="a">a</button>
+    <button data-p="b">b</button>
+    <button data-p="c">c</button>
+    <button data-p="d">d</button>
+    <button data-p="e">e</button>
+    <button data-p="f">f</button>
+  </div>
+  <div class="hint">empty rule = identity. Symbols: F + - [ ]</div>
+</div>
+<script>
+const PRESETS = {
+  a: { axiom:'F', ruleF:'F[+F]F[-F]F',         ruleX:'',                       N:5, DELTA:25.7 },
+  b: { axiom:'F', ruleF:'F[+F]F[-F][F]',       ruleX:'',                       N:5, DELTA:20.0 },
+  c: { axiom:'F', ruleF:'FF-[-F+F+F]+[+F-F-F]',ruleX:'',                       N:4, DELTA:22.5 },
+  d: { axiom:'X', ruleF:'FF',                  ruleX:'F[+X]F[-X]+X',           N:7, DELTA:20.0 },
+  e: { axiom:'X', ruleF:'FF',                  ruleX:'F[+X][-X]FX',            N:7, DELTA:25.7 },
+  f: { axiom:'X', ruleF:'FF',                  ruleX:'F-[[X]+X]+F[+FX]-X',     N:5, DELTA:22.5 },
+};
+
+let params = { axiom:'F', ruleF:'F[+F]F[-F]F', ruleX:'', N:5, DELTA:25.7 };
+let cached = null;
+
+function expand(axiom, rules, n) {
+  let s = axiom;
+  for (let i = 0; i < n; i++) {
+    let next = '';
+    for (const c of s) next += rules[c] ?? c;
+    s = next;
+  }
+  return s;
+}
+
+function buildPaths(s, deltaDeg) {
+  const delta = deltaDeg * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stack = [];
+  const paths = [];
+  let current = [[x, y]];
+  const flush = () => {
+    if (current.length > 1) paths.push(current);
+    current = [[x, y]];
+  };
+  for (const c of s) {
+    switch (c) {
+      case 'F':
+        x += Math.cos(h); y += Math.sin(h);
+        current.push([x, y]);
+        break;
+      case '+': h -= delta; flush(); break;
+      case '-': h += delta; flush(); break;
+      case '[': flush(); stack.push({x,y,h}); break;
+      case ']': {
+        flush();
+        const s2 = stack.pop();
+        x = s2.x; y = s2.y; h = s2.h;
+        current = [[x, y]];
+        break;
+      }
+    }
+  }
+  flush();
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  for (const p of paths) for (const [px, py] of p) {
+    if (px < bb.minX) bb.minX = px; if (px > bb.maxX) bb.maxX = px;
+    if (py < bb.minY) bb.minY = py; if (py > bb.maxY) bb.maxY = py;
+  }
+  return { paths, bb };
+}
+
+function regenerate() {
+  const rules = {};
+  if (params.ruleF) rules.F = params.ruleF;
+  if (params.ruleX) rules.X = params.ruleX;
+  const s = expand(params.axiom, rules, params.N);
+  cached = buildPaths(s, params.DELTA);
+  redraw();
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  for (const id of ['N','DELTA']) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    const fmt = (x) => id === 'N' ? String(x|0) : (+x).toFixed(1);
+    v.textContent = fmt(input.value);
+    input.addEventListener('input', () => {
+      params[id] = +input.value;
+      v.textContent = fmt(input.value);
+      clearActivePreset();
+      regenerate();
+    });
+  }
+  for (const id of ['axiom','ruleF','ruleX']) {
+    const input = document.getElementById(id);
+    input.addEventListener('input', () => {
+      params[id] = input.value;
+      clearActivePreset();
+      regenerate();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  applyPreset('a');
+}
+
+function clearActivePreset() {
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  for (const k of Object.keys(p)) {
+    params[k] = p[k];
+    const inp = document.getElementById(k);
+    if (inp) {
+      inp.value = p[k];
+      const v = document.getElementById(k+'v');
+      if (v) v.textContent = (k === 'N') ? String(p[k]|0) : (+p[k]).toFixed(1);
+    }
+  }
+  clearActivePreset();
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  regenerate();
+}
+
+function draw() {
+  background(250);
+  if (!cached) return;
+  const { paths, bb } = cached;
+  if (!isFinite(bb.minX)) return;
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY;
+  if (w <= 0 || h <= 0) return;
+
+  const padLeft = 360, padRight = 40, padTop = 30, padBot = 30;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBot;
+  const sc = Math.min(innerW / w, innerH / h);
+  const cx = padLeft + innerW / 2;
+  const cy = padTop + innerH / 2;
+  const ox = cx - ((bb.minX + bb.maxX) / 2) * sc;
+  const oy = cy - ((bb.minY + bb.maxY) / 2) * sc;
+
+  stroke(30);
+  strokeWeight(0.7);
+  strokeJoin(ROUND);
+  strokeCap(ROUND);
+  noFill();
+  for (const path of paths) {
+    beginShape();
+    for (const [px, py] of path) vertex(ox + px*sc, oy + py*sc);
+    endShape();
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

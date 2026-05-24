@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>L-system compound leaves (figure 5.11)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 300px; z-index: 10;
+    }
+    #panel h3 { margin: 0 0 8px; font-size: 14px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .row label { width: 60px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row .val { width: 50px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 12px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 5.11 — compound leaves</h3>
+  <div class="row"><label>D</label><input  type="range" id="D" min="0" max="12"  step="1"    value="0"><span class="val" id="Dv">0</span></div>
+  <div class="row"><label>R</label><input  type="range" id="R" min="1.0" max="2.5" step="0.01" value="2.00"><span class="val" id="Rv">2.00</span></div>
+  <div class="row"><label>n</label><input  type="range" id="N" min="1" max="45"  step="1"    value="10"><span class="val" id="Nv">10</span></div>
+  <div class="row"><label>δ°</label><input type="range" id="A" min="5" max="90"  step="0.5"  value="45"><span class="val" id="Av">45.0</span></div>
+  <div class="presets">
+    presets:
+    <button data-p="a">a</button>
+    <button data-p="b">b</button>
+    <button data-p="c">c</button>
+    <button data-p="d">d</button>
+    <button data-p="e">e</button>
+  </div>
+</div>
+<script>
+const PRESETS = {
+  a: { D:0, R:2.00, N:10, A:45 },
+  b: { D:1, R:1.50, N:16, A:45 },
+  c: { D:2, R:1.36, N:21, A:45 },
+  d: { D:4, R:1.23, N:30, A:45 },
+  e: { D:7, R:1.17, N:45, A:45 },
+};
+
+let P = { ...PRESETS.a };
+
+function expand() {
+  let toks = [{ t:'A', d:0 }];
+  for (let i = 0; i < P.N; i++) {
+    const next = [];
+    for (const tok of toks) {
+      if (tok.t === 'A') {
+        if (tok.d > 0) {
+          next.push({ t:'A', d: tok.d - 1 });
+        } else {
+          next.push(
+            { t:'F', a:1 },
+            { t:'[' }, { t:'+' }, { t:'A', d: P.D }, { t:']' },
+            { t:'[' }, { t:'-' }, { t:'A', d: P.D }, { t:']' },
+            { t:'F', a:1 },
+            { t:'A', d:0 }
+          );
+        }
+      } else if (tok.t === 'F') {
+        next.push({ t:'F', a: tok.a * P.R });
+      } else {
+        next.push(tok);
+      }
+    }
+    toks = next;
+  }
+  return toks;
+}
+
+function buildPaths(tokens) {
+  const ang = P.A * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stack = [];
+  const paths = [];
+  let current = [[x, y]];
+
+  const flush = () => {
+    if (current.length > 1) paths.push(current);
+    current = [[x, y]];
+  };
+
+  for (const tok of tokens) {
+    switch (tok.t) {
+      case 'F':
+        x += tok.a * Math.cos(h);
+        y += tok.a * Math.sin(h);
+        current.push([x, y]);
+        break;
+      case '+': h -= ang; flush(); break;
+      case '-': h += ang; flush(); break;
+      case '[': flush(); stack.push({ x, y, h }); break;
+      case ']': {
+        flush();
+        const s = stack.pop();
+        x = s.x; y = s.y; h = s.h;
+        current = [[x, y]];
+        break;
+      }
+      case 'A': break;
+    }
+  }
+  flush();
+
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  for (const p of paths) {
+    for (const [px, py] of p) {
+      if (px < bb.minX) bb.minX = px;
+      if (px > bb.maxX) bb.maxX = px;
+      if (py < bb.minY) bb.minY = py;
+      if (py > bb.maxY) bb.maxY = py;
+    }
+  }
+  return { paths, bb };
+}
+
+let cached = null;
+
+function regenerate() {
+  cached = buildPaths(expand());
+  redraw();
+}
+
+const FMT = {
+  D: v => String(v|0),
+  R: v => (+v).toFixed(2),
+  N: v => String(v|0),
+  A: v => (+v).toFixed(1),
+};
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  for (const id of Object.keys(FMT)) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    v.textContent = FMT[id](input.value);
+    input.addEventListener('input', () => {
+      P[id] = +input.value;
+      v.textContent = FMT[id](input.value);
+      clearActivePreset();
+      regenerate();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  applyPreset('a');
+}
+
+function clearActivePreset() {
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  for (const k of Object.keys(p)) {
+    P[k] = p[k];
+    const inp = document.getElementById(k);
+    if (inp) {
+      inp.value = p[k];
+      const v = document.getElementById(k+'v');
+      if (v) v.textContent = FMT[k](p[k]);
+    }
+  }
+  clearActivePreset();
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  regenerate();
+}
+
+function draw() {
+  background(250);
+  if (!cached) return;
+  const { paths, bb } = cached;
+  if (!isFinite(bb.minX)) return;
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY;
+  if (w <= 0 || h <= 0) return;
+
+  const padLeft = 360, padRight = 40, padTop = 30, padBot = 30;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBot;
+  const sc = Math.min(innerW / w, innerH / h);
+  const cx = padLeft + innerW / 2;
+  const cy = padTop + innerH / 2;
+  const ox = cx - ((bb.minX + bb.maxX) / 2) * sc;
+  const oy = cy - ((bb.minY + bb.maxY) / 2) * sc;
+
+  stroke(30); noFill();
+  strokeWeight(0.7);
+  strokeJoin(ROUND); strokeCap(ROUND);
+  for (const path of paths) {
+    beginShape();
+    for (const [px, py] of path) vertex(ox + px*sc, oy + py*sc);
+    endShape();
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

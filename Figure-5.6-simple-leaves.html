@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Simple leaves (figure 5.6)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 260px;
+    }
+    #panel h3 { margin: 0 0 6px; font-size: 14px; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .row label { width: 36px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row .val { width: 48px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 10px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 5.6 — simple leaves</h3>
+  <div class="sub">A(t) → G(LA,RA)[-B(t).][A(t+1)][+B(t).]<br>B(t):t&gt;0 → G(LB,RB)B(t-PD)</div>
+  <div class="row"><label>LA</label><input type="range" id="LA" min="1" max="10" step="0.1" value="5"><span class="val" id="LAv">5.0</span></div>
+  <div class="row"><label>RA</label><input type="range" id="RA" min="0.8" max="1.5" step="0.01" value="1.0"><span class="val" id="RAv">1.00</span></div>
+  <div class="row"><label>LB</label><input type="range" id="LB" min="0.1" max="15" step="0.1" value="1.0"><span class="val" id="LBv">1.0</span></div>
+  <div class="row"><label>RB</label><input type="range" id="RB" min="0.8" max="1.5" step="0.01" value="1.00"><span class="val" id="RBv">1.00</span></div>
+  <div class="row"><label>PD</label><input type="range" id="PD" min="0" max="2" step="0.05" value="0"><span class="val" id="PDv">0.00</span></div>
+  <div class="row"><label>n</label><input type="range" id="N" min="1" max="30" step="1" value="20"><span class="val" id="Nv">20</span></div>
+  <div class="row"><label>δ°</label><input type="range" id="DELTA" min="10" max="90" step="1" value="60"><span class="val" id="DELTAv">60</span></div>
+  <div class="presets">
+    presets:
+    <button data-p="a">a</button>
+    <button data-p="b">b</button>
+    <button data-p="c">c</button>
+    <button data-p="d">d</button>
+    <button data-p="e">e</button>
+    <button data-p="f">f</button>
+  </div>
+</div>
+<script>
+const PRESETS = {
+  a: { LA:5, RA:1.0, LB:1.0,  RB:1.00, PD:0.00 },
+  b: { LA:5, RA:1.0, LB:1.0,  RB:1.00, PD:1.00 },
+  c: { LA:5, RA:1.0, LB:0.6,  RB:1.06, PD:0.25 },
+  d: { LA:5, RA:1.2, LB:10.0, RB:1.00, PD:0.50 },
+  e: { LA:5, RA:1.2, LB:4.0,  RB:1.10, PD:0.25 },
+  f: { LA:5, RA:1.1, LB:1.0,  RB:1.20, PD:1.00 },
+};
+
+let params = { LA:5, RA:1.0, LB:1.0, RB:1.00, PD:0.00, N:20, DELTA:60 };
+
+function expand(P) {
+  let toks = [{t:'{'}, {t:'.'}, {t:'A', a:0}, {t:'}'}];
+  for (let s = 0; s < P.N; s++) {
+    const next = [];
+    for (const tok of toks) {
+      if (tok.t === 'A') {
+        const a = tok.a;
+        next.push(
+          {t:'G', s:P.LA, r:P.RA},
+          {t:'['}, {t:'-'}, {t:'B', a}, {t:'.'}, {t:']'},
+          {t:'['}, {t:'A', a: a + 1}, {t:']'},
+          {t:'['}, {t:'+'}, {t:'B', a}, {t:'.'}, {t:']'},
+        );
+      } else if (tok.t === 'B') {
+        if (tok.a > 1e-9) {
+          next.push({t:'G', s:P.LB, r:P.RB}, {t:'B', a: tok.a - P.PD});
+        } else {
+          next.push(tok);
+        }
+      } else if (tok.t === 'G') {
+        next.push({t:'G', s: tok.s * tok.r, r: tok.r});
+      } else {
+        next.push(tok);
+      }
+    }
+    toks = next;
+  }
+  return toks;
+}
+
+function build(toks, P) {
+  const ang = P.DELTA * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stack = [];
+  const polyStack = [];
+  let polygon = null;
+  const polygons = [];
+  const veins = [];
+
+  for (const tok of toks) {
+    switch (tok.t) {
+      case 'G': {
+        const nx = x + tok.s * Math.cos(h);
+        const ny = y + tok.s * Math.sin(h);
+        veins.push([[x, y], [nx, ny]]);
+        x = nx; y = ny;
+        break;
+      }
+      case '+': h -= ang; break;
+      case '-': h += ang; break;
+      case '[': stack.push({x,y,h}); break;
+      case ']': { const s = stack.pop(); x = s.x; y = s.y; h = s.h; break; }
+      case '{': polyStack.push(polygon); polygon = []; break;
+      case '}':
+        if (polygon && polygon.length >= 3) polygons.push(polygon);
+        polygon = polyStack.pop() || null;
+        break;
+      case '.': if (polygon) polygon.push([x, y]); break;
+    }
+  }
+
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  const visit = (px, py) => {
+    if (px < bb.minX) bb.minX = px; if (px > bb.maxX) bb.maxX = px;
+    if (py < bb.minY) bb.minY = py; if (py > bb.maxY) bb.maxY = py;
+  };
+  for (const p of polygons) for (const [px, py] of p) visit(px, py);
+  for (const [[ax,ay],[bx,by]] of veins) { visit(ax, ay); visit(bx, by); }
+  return { polygons, veins, bb };
+}
+
+let cached = null;
+let lastBuildMs = 0;
+
+function regenerate() {
+  const t0 = performance.now();
+  const seq = expand(params);
+  cached = build(seq, params);
+  lastBuildMs = performance.now() - t0;
+  redraw();
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  for (const id of ['LA','RA','LB','RB','PD','N','DELTA']) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    const fmt = (x) => (id === 'N' || id === 'DELTA') ? String(x|0) : (+x).toFixed(2);
+    v.textContent = fmt(input.value);
+    input.addEventListener('input', () => {
+      params[id] = +input.value;
+      v.textContent = fmt(input.value);
+      clearActivePreset();
+      regenerate();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  applyPreset('a');
+}
+
+function clearActivePreset() {
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  for (const k of Object.keys(p)) {
+    params[k] = p[k];
+    const inp = document.getElementById(k);
+    const v = document.getElementById(k+'v');
+    inp.value = p[k];
+    v.textContent = (+p[k]).toFixed(2);
+  }
+  clearActivePreset();
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  regenerate();
+}
+
+function draw() {
+  background(250);
+  if (!cached) return;
+  const { polygons, veins, bb } = cached;
+  if (!isFinite(bb.minX)) return;
+
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY;
+  if (w <= 0 || h <= 0) return;
+
+  const padLeft = 320, padRight = 40, padTop = 30, padBot = 30;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBot;
+  const sc = Math.min(innerW / w, innerH / h);
+  const cx = padLeft + innerW / 2;
+  const cy = padTop + innerH / 2;
+  const ox = cx - ((bb.minX + bb.maxX) / 2) * sc;
+  const oy = cy - ((bb.minY + bb.maxY) / 2) * sc;
+
+  stroke(60);
+  strokeWeight(0.35);
+  noFill();
+  for (const [[ax,ay],[bx,by]] of veins) {
+    line(ox + ax*sc, oy + ay*sc, ox + bx*sc, oy + by*sc);
+  }
+
+  stroke(20);
+  strokeWeight(0.9);
+  strokeJoin(ROUND);
+  noFill();
+  for (const poly of polygons) {
+    beginShape();
+    for (const [px, py] of poly) vertex(ox + px*sc, oy + py*sc);
+    endShape(CLOSE);
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

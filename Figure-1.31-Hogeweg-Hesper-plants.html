@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>L-system plants (figure 1.31)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 320px;
+      max-height: calc(100vh - 24px); overflow-y: auto;
+      z-index: 5;
+    }
+    #panel h3 { margin: 0 0 6px; font-size: 14px; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .row label { width: 50px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row input[type=text] { flex: 1; font-family: monospace; font-size: 12px; padding: 3px 5px; }
+    .row .val { width: 48px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 10px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+    .grammar { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .grammar h4 { margin: 0 0 6px; font-size: 12px; font-family: monospace; color:#333; }
+    .rule { display: flex; align-items: center; gap: 4px; margin: 2px 0; font-family: monospace; font-size: 12px; }
+    .rule .ctx { color:#444; white-space: nowrap; }
+    .rule .arrow { color:#888; }
+    .rule input[type=text] { flex: 1; font-family: monospace; font-size: 12px; padding: 2px 5px; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 1.31 — Hogeweg &amp; Hesper context-sensitive plants</h3>
+  <div class="sub">Pick preset a–e; tweak n, δ, axiom and any production successor.</div>
+  <div class="row"><label>n</label><input type="range" id="N" min="1" max="40" step="1" value="30"><span class="val" id="Nv">30</span></div>
+  <div class="row"><label>δ°</label><input type="range" id="DELTA" min="0" max="180" step="0.25" value="22.5"><span class="val" id="DELTAv">22.50</span></div>
+  <div class="row"><label>axiom</label><input type="text" id="axiom" value="F1F1F1"></div>
+  <div class="row"><label>ignore</label><input type="text" id="ignore" value="+-F"></div>
+  <div class="presets">
+    presets:
+    <button data-p="a">a</button>
+    <button data-p="b">b</button>
+    <button data-p="c">c</button>
+    <button data-p="d">d</button>
+    <button data-p="e">e</button>
+  </div>
+  <div class="grammar">
+    <h4>productions (l &lt; c &gt; r → succ)</h4>
+    <div id="rulesBox"></div>
+  </div>
+</div>
+<script>
+const RULES_AB_COMMON = [
+  ['*','+','*','-'],
+  ['*','-','*','+'],
+];
+const VARIANTS = {
+  a: {
+    n:30, delta:22.5, axiom:'F1F1F1', ignore:'+-F',
+    rules: [
+      ['0','0','0','0'],
+      ['0','0','1','1[+F1F1]'],
+      ['0','1','0','1'],
+      ['0','1','1','1'],
+      ['1','0','0','0'],
+      ['1','0','1','1F1'],
+      ['1','1','0','0'],
+      ['1','1','1','0'],
+      ...RULES_AB_COMMON,
+    ],
+  },
+  b: {
+    n:30, delta:22.5, axiom:'F1F1F1', ignore:'+-F',
+    rules: [
+      ['0','0','0','1'],
+      ['0','0','1','1[-F1F1]'],
+      ['0','1','0','1'],
+      ['0','1','1','1'],
+      ['1','0','0','0'],
+      ['1','0','1','1F1'],
+      ['1','1','0','1'],
+      ['1','1','1','0'],
+      ...RULES_AB_COMMON,
+    ],
+  },
+  c: {
+    n:26, delta:25.75, axiom:'F1F1F1', ignore:'+-F',
+    rules: [
+      ['0','0','0','0'],
+      ['0','0','1','1'],
+      ['0','1','0','0'],
+      ['0','1','1','1[+F1F1]'],
+      ['1','0','0','0'],
+      ['1','0','1','1F1'],
+      ['1','1','0','0'],
+      ['1','1','1','0'],
+      ...RULES_AB_COMMON,
+    ],
+  },
+  d: {
+    n:24, delta:25.75, axiom:'F0F1F1', ignore:'+-F',
+    rules: [
+      ['0','0','0','1'],
+      ['0','0','1','0'],
+      ['0','1','0','0'],
+      ['0','1','1','1F1'],
+      ['1','0','0','1'],
+      ['1','0','1','1[+F1F1]'],
+      ['1','1','0','1'],
+      ['1','1','1','0'],
+      ...RULES_AB_COMMON,
+    ],
+  },
+  e: {
+    n:26, delta:22.5, axiom:'F1F1F1', ignore:'+-F',
+    rules: [
+      ['0','0','0','0'],
+      ['0','0','1','1[-F1F1]'],
+      ['0','1','0','1'],
+      ['0','1','1','1'],
+      ['1','0','0','0'],
+      ['1','0','1','1F1'],
+      ['1','1','0','1'],
+      ['1','1','1','0'],
+      ...RULES_AB_COMMON,
+    ],
+  },
+};
+
+let activeKey = 'a';
+let params = {
+  N: VARIANTS.a.n,
+  DELTA: VARIANTS.a.delta,
+  axiom: VARIANTS.a.axiom,
+  ignore: VARIANTS.a.ignore,
+  rules: VARIANTS.a.rules.map(r => [...r]),
+};
+
+function leftContext(s, i, ignoreSet) {
+  let depth = 0;
+  for (let j = i - 1; j >= 0; j--) {
+    const c = s[j];
+    if (c === ']') { depth++; continue; }
+    if (c === '[') {
+      if (depth > 0) { depth--; continue; }
+      continue;
+    }
+    if (depth > 0) continue;
+    if (ignoreSet.has(c)) continue;
+    return c;
+  }
+  return null;
+}
+
+function rightContext(s, i, ignoreSet) {
+  for (let j = i + 1; j < s.length; j++) {
+    const c = s[j];
+    if (c === '[') {
+      let d = 1;
+      while (++j < s.length && d > 0) {
+        if (s[j] === '[') d++;
+        else if (s[j] === ']') d--;
+      }
+      continue;
+    }
+    if (c === ']') return null;
+    if (ignoreSet.has(c)) continue;
+    return c;
+  }
+  return null;
+}
+
+function ctxMatch(rulePart, actual) {
+  if (rulePart === '*') return true;
+  return rulePart === actual;
+}
+
+function findRule(rules, sym, lc, rc) {
+  for (const [l, p, r, succ] of rules) {
+    if (p !== sym) continue;
+    if (!ctxMatch(l, lc)) continue;
+    if (!ctxMatch(r, rc)) continue;
+    return succ;
+  }
+  return null;
+}
+
+function expand(n) {
+  let s = params.axiom;
+  const ignoreSet = new Set(params.ignore.split(''));
+  for (let step = 0; step < n; step++) {
+    let next = '';
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '[' || c === ']') { next += c; continue; }
+      const lc = leftContext(s, i, ignoreSet);
+      const rc = rightContext(s, i, ignoreSet);
+      const succ = findRule(params.rules, c, lc, rc);
+      next += (succ !== null ? succ : c);
+    }
+    s = next;
+  }
+  return s;
+}
+
+function buildPaths(s, deltaDeg) {
+  const delta = deltaDeg * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stack = [];
+  const paths = [];
+  let current = [[x, y]];
+  const flush = () => {
+    if (current.length > 1) paths.push(current);
+    current = [[x, y]];
+  };
+  for (const c of s) {
+    switch (c) {
+      case 'F':
+        x += Math.cos(h);
+        y += Math.sin(h);
+        current.push([x, y]);
+        break;
+      case '+': h -= delta; flush(); break;
+      case '-': h += delta; flush(); break;
+      case '[': flush(); stack.push({ x, y, h }); break;
+      case ']': {
+        flush();
+        const st = stack.pop();
+        x = st.x; y = st.y; h = st.h;
+        current = [[x, y]];
+        break;
+      }
+    }
+  }
+  flush();
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  for (const p of paths) for (const [px, py] of p) {
+    if (px < bb.minX) bb.minX = px;
+    if (px > bb.maxX) bb.maxX = px;
+    if (py < bb.minY) bb.minY = py;
+    if (py > bb.maxY) bb.maxY = py;
+  }
+  return { paths, bb };
+}
+
+let cached = null;
+
+function regenerate() {
+  const s = expand(params.N);
+  cached = buildPaths(s, params.DELTA);
+  redraw();
+}
+
+function renderRules() {
+  const box = document.getElementById('rulesBox');
+  box.innerHTML = '';
+  params.rules.forEach((rule, idx) => {
+    const [l, p, r, succ] = rule;
+    const row = document.createElement('div');
+    row.className = 'rule';
+    const ctx = document.createElement('span');
+    ctx.className = 'ctx';
+    ctx.textContent = `${l} < ${p} > ${r}`;
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    arrow.textContent = '→';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = succ;
+    inp.spellcheck = false;
+    inp.addEventListener('input', () => {
+      params.rules[idx] = [l, p, r, inp.value];
+      regenerate();
+    });
+    row.appendChild(ctx);
+    row.appendChild(arrow);
+    row.appendChild(inp);
+    box.appendChild(row);
+  });
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  for (const id of ['N','DELTA']) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    const fmt = (x) => id === 'N' ? String(x|0) : (+x).toFixed(2);
+    v.textContent = fmt(input.value);
+    input.addEventListener('input', () => {
+      params[id] = +input.value;
+      v.textContent = fmt(input.value);
+      regenerate();
+    });
+  }
+  for (const id of ['axiom','ignore']) {
+    const input = document.getElementById(id);
+    input.addEventListener('input', () => {
+      params[id] = input.value;
+      regenerate();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  applyPreset('a');
+}
+
+function applyPreset(key) {
+  activeKey = key;
+  const V = VARIANTS[key];
+  params.N = V.n;
+  params.DELTA = V.delta;
+  params.axiom = V.axiom;
+  params.ignore = V.ignore;
+  params.rules = V.rules.map(r => [...r]);
+  document.getElementById('N').value = V.n;
+  document.getElementById('DELTA').value = V.delta;
+  document.getElementById('axiom').value = V.axiom;
+  document.getElementById('ignore').value = V.ignore;
+  document.getElementById('Nv').textContent = String(V.n);
+  document.getElementById('DELTAv').textContent = (+V.delta).toFixed(2);
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  renderRules();
+  regenerate();
+}
+
+function draw() {
+  background(250);
+  if (!cached) return;
+  const { paths, bb } = cached;
+  if (!isFinite(bb.minX)) return;
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY;
+  if (w <= 0 || h <= 0) return;
+
+  const padLeft = 380, padRight = 40, padTop = 30, padBot = 30;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBot;
+  const sc = Math.min(innerW / w, innerH / h);
+  const cx = padLeft + innerW / 2;
+  const cy = padTop + innerH / 2;
+  const ox = cx - ((bb.minX + bb.maxX) / 2) * sc;
+  const oy = cy - ((bb.minY + bb.maxY) / 2) * sc;
+
+  stroke(30); noFill();
+  strokeWeight(0.6);
+  strokeJoin(ROUND); strokeCap(ROUND);
+  for (const path of paths) {
+    beginShape();
+    for (const [px, py] of path) vertex(ox + px*sc, oy + py*sc);
+    endShape();
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

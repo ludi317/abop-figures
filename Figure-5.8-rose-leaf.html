@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Rose leaf (figure 5.8)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; }
+    #title { position: fixed; top: 12px; left: 12px; background: rgba(255,255,255,0.85); padding: 6px 10px; border-radius: 6px; font-size: 14px; z-index: 5; }
+    #panel {
+      position: fixed; top: 56px; left: 12px;
+      background: rgba(255,255,255,0.92);
+      padding: 10px 12px; border-radius: 6px;
+      font-size: 12px; font-family: sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      z-index: 5;
+      display: grid; grid-template-columns: 60px 140px 50px; gap: 4px 8px;
+      align-items: center;
+    }
+    #panel label { white-space: nowrap; }
+    #panel input[type=range] { width: 140px; }
+    #panel .val { font-variant-numeric: tabular-nums; color: #333; }
+    #panel .reset {
+      grid-column: 1 / -1;
+      margin-top: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #panel .reset:hover { background: #e6e6e6; }
+  </style>
+</head>
+<body>
+<div id="title">Figure 5.8 — A rose leaf</div>
+<div id="panel"></div>
+<script>
+const PARAMS = [
+  { id:'N_STEPS',   label:'n',  min:1,   max:30,  step:1,    value:25  },
+  { id:'ANGLE_DEG', label:'δ (deg)', min:5, max:90, step:1, value:30 },
+  { id:'LA', label:'LA', min:0.5, max:10, step:0.1, value:5 },
+  { id:'RA', label:'RA', min:0.8, max:1.5, step:0.01, value:1.15 },
+  { id:'LB', label:'LB', min:0.1, max:5, step:0.1, value:1.3 },
+  { id:'RB', label:'RB', min:0.8, max:1.5, step:0.01, value:1.25 },
+  { id:'LC', label:'LC', min:0.5, max:8, step:0.1, value:3 },
+  { id:'RC', label:'RC', min:0.8, max:1.5, step:0.01, value:1.19 },
+];
+const T_EPS = 1e-9;
+const state = {};
+
+function buildPanel() {
+  const panel = document.getElementById('panel');
+  const controls = [];
+  for (const p of PARAMS) {
+    state[p.id] = p.value;
+    const lbl = document.createElement('label'); lbl.textContent = p.label; lbl.htmlFor = p.id;
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.id = p.id;
+    inp.min = p.min; inp.max = p.max; inp.step = p.step; inp.value = p.value;
+    const val = document.createElement('span'); val.className = 'val';
+    val.textContent = formatVal(p, p.value);
+    inp.addEventListener('input', () => {
+      state[p.id] = parseFloat(inp.value);
+      val.textContent = formatVal(p, state[p.id]);
+      rebuild();
+      redraw();
+    });
+    panel.appendChild(lbl); panel.appendChild(inp); panel.appendChild(val);
+    controls.push({ p, inp, val });
+  }
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'reset';
+  resetBtn.textContent = 'Reset to defaults';
+  resetBtn.addEventListener('click', () => {
+    for (const { p, inp, val } of controls) {
+      state[p.id] = p.value;
+      inp.value = p.value;
+      val.textContent = formatVal(p, p.value);
+    }
+    rebuild();
+    redraw();
+  });
+  panel.appendChild(resetBtn);
+}
+
+function formatVal(p, v) {
+  return p.step >= 1 ? String(v) : Number(v).toFixed(2);
+}
+
+function expand() {
+  const N = state.N_STEPS;
+  const LA = state.LA, RA = state.RA;
+  const LB = state.LB, RB = state.RB;
+  const LC = state.LC, RC = state.RC;
+
+  let toks = [
+    {t:'['}, {t:'{'}, {t:'A', tp:0, d:0}, {t:'.'}, {t:'}'}, {t:']'},
+    {t:'['}, {t:'{'}, {t:'A', tp:0, d:1}, {t:'.'}, {t:'}'}, {t:']'},
+  ];
+  for (let step = 0; step < N; step++) {
+    const next = [];
+    for (const tok of toks) {
+      if (tok.t === 'A') {
+        const sign = tok.d === 0 ? '+' : '-';
+        next.push(
+          {t:'.'}, {t:'G', s:LA, r:RA}, {t:'.'},
+          {t:'['}, {t:sign}, {t:'B', tp:tok.tp},
+            {t:'G', s:LC, r:RC, tp:tok.tp}, {t:'.'}, {t:'}'}, {t:']'},
+          {t:'['}, {t:sign}, {t:'B', tp:tok.tp},
+            {t:'{'}, {t:'.'}, {t:']'},
+          {t:'A', tp:tok.tp + 1, d:tok.d},
+        );
+      } else if (tok.t === 'B') {
+        if (tok.tp > T_EPS) {
+          next.push({t:'G', s:LB, r:RB}, {t:'B', tp:tok.tp - 1});
+        } else {
+          next.push(tok);
+        }
+      } else if (tok.t === 'G') {
+        if (tok.tp === undefined) {
+          next.push({t:'G', s: tok.s * tok.r, r: tok.r});
+        } else if (tok.tp > 1 + T_EPS) {
+          next.push({t:'G', s: tok.s * tok.r, r: tok.r, tp: tok.tp - 1});
+        } else {
+          next.push(tok);
+        }
+      } else {
+        next.push(tok);
+      }
+    }
+    toks = next;
+  }
+  return toks;
+}
+
+function buildLeaf(toks) {
+  const ANGLE_RAD = state.ANGLE_DEG * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stack = [];
+  const polyStack = [];
+  let polygon = null;
+  const polygons = [];
+  const veins = [];
+
+  for (const tok of toks) {
+    switch (tok.t) {
+      case 'G': {
+        const nx = x + tok.s * Math.cos(h);
+        const ny = y + tok.s * Math.sin(h);
+        veins.push([[x, y], [nx, ny]]);
+        x = nx; y = ny;
+        break;
+      }
+      case '+': h -= ANGLE_RAD; break;
+      case '-': h += ANGLE_RAD; break;
+      case '[': stack.push({ x, y, h }); break;
+      case ']': {
+        const s = stack.pop();
+        x = s.x; y = s.y; h = s.h;
+        break;
+      }
+      case '{':
+        polyStack.push(polygon);
+        polygon = [];
+        break;
+      case '}':
+        if (polygon && polygon.length >= 3) polygons.push(polygon);
+        polygon = polyStack.pop() || null;
+        break;
+      case '.':
+        if (polygon) polygon.push([x, y]);
+        break;
+    }
+  }
+
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  const visit = (px, py) => {
+    if (px < bb.minX) bb.minX = px;
+    if (px > bb.maxX) bb.maxX = px;
+    if (py < bb.minY) bb.minY = py;
+    if (py > bb.maxY) bb.maxY = py;
+  };
+  for (const p of polygons) for (const [px, py] of p) visit(px, py);
+  for (const [[ax, ay], [bx, by]] of veins) { visit(ax, ay); visit(bx, by); }
+  return { polygons, veins, bb };
+}
+
+let leaf;
+
+function rebuild() {
+  leaf = buildLeaf(expand());
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  buildPanel();
+  rebuild();
+}
+
+function draw() {
+  background(250);
+  const w = leaf.bb.maxX - leaf.bb.minX;
+  const h = leaf.bb.maxY - leaf.bb.minY;
+  if (!(w > 0 && h > 0)) return;
+  const padTop = 50, padBot = 30, padX = 30;
+  const sc = Math.min((width - 2*padX) / w, (height - padTop - padBot) / h);
+  const cx = width / 2;
+  const cy = padTop + (height - padTop - padBot) / 2;
+  const ox = cx - ((leaf.bb.minX + leaf.bb.maxX) / 2) * sc;
+  const oy = cy - ((leaf.bb.minY + leaf.bb.maxY) / 2) * sc;
+
+  stroke(80);
+  strokeWeight(0.4);
+  noFill();
+  for (const [[ax, ay], [bx, by]] of leaf.veins) {
+    line(ox + ax*sc, oy + ay*sc, ox + bx*sc, oy + by*sc);
+  }
+
+  stroke(20);
+  strokeWeight(1.0);
+  strokeJoin(ROUND);
+  noFill();
+  for (const poly of leaf.polygons) {
+    beginShape();
+    for (const [px, py] of poly) vertex(ox + px*sc, oy + py*sc);
+    endShape(CLOSE);
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

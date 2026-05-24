@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Barnsley fern (figure 8.2)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; }
+    #title { position: fixed; top: 12px; left: 12px; background: rgba(255,255,255,0.92); padding: 8px 10px; border-radius: 6px; font-size: 13px; z-index:10; }
+    #ui { position: fixed; top: 50px; left: 12px; background: rgba(255,255,255,0.92); padding: 10px 12px; border-radius: 6px; font-size: 13px; z-index:10; }
+    #ui .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
+    #ui label { width: 78px; font-family: monospace; font-size: 12px; }
+    #ui input[type=range] { width: 140px; }
+    #ui .val { width: 50px; text-align:right; font-family: monospace; font-size: 12px; }
+    #ui button { margin-top: 6px; padding: 4px 10px; font-size: 12px; cursor:pointer; }
+  </style>
+</head>
+<body>
+<div id="title">Figure 8.2 — Barnsley fern</div>
+<div id="ui">
+  <div class="row"><label>points (M)</label><input type="range" id="N"     min="0.1" max="3"   step="0.1"  value="2.0"><span class="val" id="Nv">2.0</span></div>
+  <div class="row"><label>tilt °</label>    <input type="range" id="TILT"  min="-45" max="45"  step="0.1"  value="2.7"><span class="val" id="TILTv">2.7</span></div>
+  <div class="row"><label>main scale</label><input type="range" id="SCALE" min="0.6" max="0.95" step="0.005" value="0.85"><span class="val" id="SCALEv">0.85</span></div>
+  <div class="row"><label>frond size</label><input type="range" id="FS"    min="0.4" max="1.6" step="0.01" value="1.00"><span class="val" id="FSv">1.00</span></div>
+  <div class="row"><label>frond angle°</label><input type="range" id="FA"  min="-40" max="40"  step="0.5"  value="0"><span class="val" id="FAv">0.0</span></div>
+  <div class="row"><label>stem prob</label> <input type="range" id="SP"    min="0"   max="0.05" step="0.001" value="0.01"><span class="val" id="SPv">0.010</span></div>
+  <button id="reset">Reset</button>
+</div>
+<script>
+const RAD = Math.PI / 180;
+
+const DEFAULTS = { N: 2.0, TILT: 2.7, SCALE: 0.85, FS: 1.00, FA: 0, SP: 0.01 };
+let params = { ...DEFAULTS };
+
+let pts;
+
+function buildTransforms() {
+  const tilt = params.TILT * RAD;
+  const s = params.SCALE;
+  const c4 = Math.cos(tilt), s4 = Math.sin(tilt);
+  const T4 = { a: s*c4, b: -s*s4, c: s*s4, d: s*c4, e: 0, f: 1.60 };
+
+  const fs = params.FS, fa = params.FA * RAD;
+  const ca = Math.cos(fa), sa = Math.sin(fa);
+  const rot = (M) => ({
+    a: fs*(ca*M.a - sa*M.c),
+    b: fs*(ca*M.b - sa*M.d),
+    c: fs*(sa*M.a + ca*M.c),
+    d: fs*(sa*M.b + ca*M.d),
+    e: M.e, f: M.f,
+  });
+  const baseT2 = { a: 0.20, b: -0.26, c: 0.23, d: 0.22, e: 0, f: 1.60 };
+  const baseT3 = { a: -0.15, b: 0.28, c: 0.26, d: 0.24, e: 0, f: 0.44 };
+  const T2 = rot(baseT2);
+  const T3 = rot(baseT3);
+
+  const T1 = { a: 0, b: 0, c: 0, d: 0.16, e: 0, f: 0 };
+
+  const sp = params.SP;
+  const rest = 1 - sp;
+  T1.p = sp;
+  T2.p = 0.07 * rest / 0.99;
+  T3.p = 0.07 * rest / 0.99;
+  T4.p = 0.85 * rest / 0.99;
+  return [T1, T2, T3, T4];
+}
+
+function generatePoints() {
+  const T = buildTransforms();
+  const cum = [];
+  let acc = 0;
+  for (const t of T) { acc += t.p; cum.push(acc); }
+
+  const N_POINTS = Math.round(params.N * 1_000_000);
+  pts = new Float32Array(N_POINTS * 2);
+
+  let x = 0, y = 0;
+  for (let k = 0; k < 50; k++) {
+    const r = Math.random();
+    let i = 0; while (r > cum[i]) i++;
+    const t = T[i];
+    [x, y] = [t.a*x + t.b*y + t.e, t.c*x + t.d*y + t.f];
+  }
+
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  for (let k = 0; k < N_POINTS; k++) {
+    const r = Math.random();
+    let i = 0; while (r > cum[i]) i++;
+    const t = T[i];
+    [x, y] = [t.a*x + t.b*y + t.e, t.c*x + t.d*y + t.f];
+    pts[2*k] = x; pts[2*k+1] = y;
+    if (x < bb.minX) bb.minX = x;
+    if (x > bb.maxX) bb.maxX = x;
+    if (y < bb.minY) bb.minY = y;
+    if (y > bb.maxY) bb.maxY = y;
+  }
+  pts.bb = bb;
+  pts.count = N_POINTS;
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  pixelDensity(1);
+
+  const fmtN = v => (+v).toFixed(1);
+  const fmt2 = v => (+v).toFixed(2);
+  const fmt3 = v => (+v).toFixed(3);
+  const formatters = { N: fmtN, TILT: fmtN, SCALE: fmt2, FS: fmt2, FA: fmtN, SP: fmt3 };
+  const ids = ['N', 'TILT', 'SCALE', 'FS', 'FA', 'SP'];
+  let pending = false;
+  const refresh = () => {
+    if (pending) return;
+    pending = true;
+    setTimeout(() => {
+      pending = false;
+      generatePoints();
+      redraw();
+    }, 30);
+  };
+  for (const id of ids) {
+    const inp = document.getElementById(id);
+    const val = document.getElementById(id+'v');
+    val.textContent = formatters[id](inp.value);
+    inp.addEventListener('input', () => {
+      params[id] = +inp.value;
+      val.textContent = formatters[id](inp.value);
+      refresh();
+    });
+  }
+  document.getElementById('reset').addEventListener('click', () => {
+    params = { ...DEFAULTS };
+    for (const id of ids) {
+      const inp = document.getElementById(id);
+      const val = document.getElementById(id+'v');
+      inp.value = DEFAULTS[id];
+      val.textContent = formatters[id](inp.value);
+    }
+    refresh();
+  });
+
+  generatePoints();
+}
+
+function draw() {
+  background(250);
+
+  const bb = pts.bb;
+  const N_POINTS = pts.count;
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY;
+  const padTop = 50, padBot = 30, padX = 30;
+  const sc = Math.min((width - 2*padX) / w, (height - padTop - padBot) / h);
+  const ox = width / 2 - ((bb.minX + bb.maxX) / 2) * sc;
+  const oy = padTop + (height - padTop - padBot) / 2 + ((bb.minY + bb.maxY) / 2) * sc;
+
+  loadPixels();
+  const counts = new Uint16Array(width * height);
+  for (let k = 0; k < N_POINTS; k++) {
+    const x = Math.round(ox + pts[2*k] * sc);
+    const y = Math.round(oy - pts[2*k+1] * sc);
+    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+    counts[y * width + x]++;
+  }
+  for (let i = 0; i < width * height; i++) {
+    const c = counts[i];
+    if (c === 0) continue;
+    const idx = i * 4;
+    const alpha = Math.min(255, 70 + c * 20);
+    pixels[idx] = 25;
+    pixels[idx+1] = 55;
+    pixels[idx+2] = 25;
+    pixels[idx+3] = alpha;
+  }
+  updatePixels();
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>3D bush (figure 1.25)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #f4f1ea; font-family: sans-serif; overflow: hidden; }
+    #ui { position: fixed; top: 12px; left: 12px; background: rgba(255,255,255,0.92); padding: 10px 12px; border-radius: 6px; z-index:10; font-size: 13px; }
+    #ui .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
+    #ui label { width: 38px; font-family: monospace; }
+    #ui input[type=range] { width: 140px; }
+    #ui .val { width: 40px; text-align:right; font-family: monospace; font-size: 12px; }
+    #hint { position: fixed; bottom: 10px; left: 12px; color:#666; font-size:12px; z-index:10; }
+  </style>
+</head>
+<body>
+<div id="ui">
+  <div><strong>Figure 1.25</strong> — 3D bush</div>
+  <div class="row"><label>n</label><input type="range" id="N" min="1" max="7" step="1" value="6"><span class="val" id="Nv">6</span></div>
+  <div class="row"><label>δ°</label><input type="range" id="DELTA" min="5" max="60" step="0.5" value="22.5"><span class="val" id="DELTAv">22.5</span></div>
+</div>
+<div id="hint">drag to orbit · scroll to zoom</div>
+<script>
+const STEP_F = 10;
+const STEP_LEAF = 2.5;
+const WIDTH_DECAY = 0.85;
+const RAD = Math.PI / 180;
+
+let params = { N: 6, DELTA: 22.5 };
+let segments = [];
+let leaves = [];
+let sceneRadius = 1;
+let cam;
+
+function expand(n) {
+  let toks = [{t:'A'}];
+  for (let i = 0; i < n; i++) {
+    const next = [];
+    for (const tok of toks) {
+      switch (tok.t) {
+        case 'A':
+          next.push(
+            {t:'['}, {t:'&'}, {t:'F'}, {t:'L'}, {t:'!'}, {t:'A'}, {t:']'},
+            {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'\''},
+            {t:'['}, {t:'&'}, {t:'F'}, {t:'L'}, {t:'!'}, {t:'A'}, {t:']'},
+            {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'\''},
+            {t:'['}, {t:'&'}, {t:'F'}, {t:'L'}, {t:'!'}, {t:'A'}, {t:']'},
+          );
+          break;
+        case 'F':
+          next.push({t:'S'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'/'}, {t:'F'});
+          break;
+        case 'S':
+          next.push({t:'F'}, {t:'L'});
+          break;
+        case 'L':
+          next.push(
+            {t:'['}, {t:'\''}, {t:'\''}, {t:'\''}, {t:'^'}, {t:'^'},
+            {t:'{'},
+            {t:'-'}, {t:'f'}, {t:'+'}, {t:'f'}, {t:'+'}, {t:'f'},
+            {t:'-'}, {t:'|'},
+            {t:'-'}, {t:'f'}, {t:'+'}, {t:'f'}, {t:'+'}, {t:'f'},
+            {t:'}'}, {t:']'},
+          );
+          break;
+        default:
+          next.push(tok);
+      }
+    }
+    toks = next;
+  }
+  return toks;
+}
+
+function rot3(v, k, ang) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const d = k[0]*v[0] + k[1]*v[1] + k[2]*v[2];
+  return [
+    v[0]*c + (k[1]*v[2] - k[2]*v[1])*s + k[0]*d*(1-c),
+    v[1]*c + (k[2]*v[0] - k[0]*v[2])*s + k[1]*d*(1-c),
+    v[2]*c + (k[0]*v[1] - k[1]*v[0])*s + k[2]*d*(1-c),
+  ];
+}
+
+function buildScene(toks) {
+  const ANG = params.DELTA * RAD;
+  let H = [0, 1, 0], L = [-1, 0, 0], U = [0, 0, 1];
+  let pos = [0, 0, 0];
+  let parent = -1;
+  const stack = [];
+  const segs = [];
+  const lvs = [];
+  let polygon = null;
+  const polyStack = [];
+
+  for (const tok of toks) {
+    switch (tok.t) {
+      case 'F': {
+        const p0 = [...pos];
+        pos = [pos[0]+STEP_F*H[0], pos[1]+STEP_F*H[1], pos[2]+STEP_F*H[2]];
+        if (polygon) polygon.push([...pos]);
+        const idx = segs.length;
+        segs.push({ p0, p1: [...pos], parent, children: [] });
+        if (parent >= 0) segs[parent].children.push(idx);
+        parent = idx;
+        break;
+      }
+      case 'f': {
+        pos = [pos[0]+STEP_LEAF*H[0], pos[1]+STEP_LEAF*H[1], pos[2]+STEP_LEAF*H[2]];
+        if (polygon) polygon.push([...pos]);
+        break;
+      }
+      case '+': H = rot3(H, U,  ANG); L = rot3(L, U,  ANG); break;
+      case '-': H = rot3(H, U, -ANG); L = rot3(L, U, -ANG); break;
+      case '&': H = rot3(H, L,  ANG); U = rot3(U, L,  ANG); break;
+      case '^': H = rot3(H, L, -ANG); U = rot3(U, L, -ANG); break;
+      case '/': L = rot3(L, H,  ANG); U = rot3(U, H,  ANG); break;
+      case '\\':L = rot3(L, H, -ANG); U = rot3(U, H, -ANG); break;
+      case '|': H = rot3(H, U, Math.PI); L = rot3(L, U, Math.PI); break;
+      case '[': stack.push({ H:[...H], L:[...L], U:[...U], pos:[...pos], parent }); break;
+      case ']': {
+        const s = stack.pop();
+        H = s.H; L = s.L; U = s.U; pos = s.pos; parent = s.parent;
+        break;
+      }
+      case '{':
+        polyStack.push(polygon);
+        polygon = [];
+        break;
+      case '}':
+        if (polygon && polygon.length >= 3) lvs.push(polygon);
+        polygon = polyStack.pop() || null;
+        break;
+    }
+  }
+
+  // pipe-model: each segment's thickness² ≈ sum of leaf-segment thickness²
+  // Compute by post-order: tips get a small base, internal nodes accumulate from children.
+  for (const seg of segs) seg.thick2 = 0;
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const seg = segs[i];
+    if (seg.children.length === 0) {
+      seg.thick2 = 1;
+    } else {
+      let sum = 0;
+      for (const c of seg.children) sum += segs[c].thick2;
+      seg.thick2 = sum;
+    }
+  }
+  let maxThick = 0;
+  for (const seg of segs) {
+    seg.thick = Math.sqrt(seg.thick2);
+    if (seg.thick > maxThick) maxThick = seg.thick;
+  }
+
+  const bb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  const visit = (p) => {
+    if (p[0]<bb[0]) bb[0]=p[0]; if (p[1]<bb[1]) bb[1]=p[1]; if (p[2]<bb[2]) bb[2]=p[2];
+    if (p[0]>bb[3]) bb[3]=p[0]; if (p[1]>bb[4]) bb[4]=p[1]; if (p[2]>bb[5]) bb[5]=p[2];
+  };
+  for (const seg of segs) { visit(seg.p0); visit(seg.p1); }
+  for (const poly of lvs) for (const p of poly) visit(p);
+  const cx = (bb[0]+bb[3])/2, cy = (bb[1]+bb[4])/2, cz = (bb[2]+bb[5])/2;
+  const r = Math.max(bb[3]-bb[0], bb[4]-bb[1], bb[5]-bb[2]) / 2;
+
+  // Synthesize leaves at every branch tip so apical buds (unexpanded `A`) are
+  // covered. For each tip segment build a small rosette of polygons oriented
+  // perpendicular to the growth direction.
+  const LEAF_R = STEP_F * 1.1;
+  for (const seg of segs) {
+    if (seg.children.length !== 0) continue;
+    const dx = seg.p1[0]-seg.p0[0];
+    const dy = seg.p1[1]-seg.p0[1];
+    const dz = seg.p1[2]-seg.p0[2];
+    const dl = Math.sqrt(dx*dx+dy*dy+dz*dz) || 1;
+    const vx = dx/dl, vy = dy/dl, vz = dz/dl;
+    let ux, uy, uz;
+    if (Math.abs(vy) < 0.9) { ux = 0; uy = 1; uz = 0; }
+    else                    { ux = 1; uy = 0; uz = 0; }
+    const dot = ux*vx + uy*vy + uz*vz;
+    ux -= dot*vx; uy -= dot*vy; uz -= dot*vz;
+    const ul = Math.sqrt(ux*ux+uy*uy+uz*uz) || 1;
+    ux/=ul; uy/=ul; uz/=ul;
+    const wx = vy*uz - vz*uy, wy = vz*ux - vx*uz, wz = vx*uy - vy*ux;
+    const cx0 = seg.p1[0] + vx*LEAF_R*0.3;
+    const cy0 = seg.p1[1] + vy*LEAF_R*0.3;
+    const cz0 = seg.p1[2] + vz*LEAF_R*0.3;
+    // single leaf per tip
+    for (let k = 0; k < 1; k++) {
+      const baseAng = 0;
+      const tilt = 0.4;
+      // tilt the leaf normal slightly off-axis
+      const nx = vx*Math.cos(tilt) + (ux*Math.cos(baseAng)+wx*Math.sin(baseAng))*Math.sin(tilt);
+      const ny = vy*Math.cos(tilt) + (uy*Math.cos(baseAng)+wy*Math.sin(baseAng))*Math.sin(tilt);
+      const nz = vz*Math.cos(tilt) + (uz*Math.cos(baseAng)+wz*Math.sin(baseAng))*Math.sin(tilt);
+      // build basis perpendicular to n
+      let pux, puy, puz;
+      if (Math.abs(ny) < 0.9) { pux = 0; puy = 1; puz = 0; }
+      else                    { pux = 1; puy = 0; puz = 0; }
+      const pd = pux*nx + puy*ny + puz*nz;
+      pux -= pd*nx; puy -= pd*ny; puz -= pd*nz;
+      const pul = Math.sqrt(pux*pux+puy*puy+puz*puz) || 1;
+      pux/=pul; puy/=pul; puz/=pul;
+      const pwx = ny*puz - nz*puy, pwy = nz*pux - nx*puz, pwz = nx*puy - ny*pux;
+      const lcx = cx0;
+      const lcy = cy0;
+      const lcz = cz0;
+      // simple almond/lens leaf: pointed at both ends, widest in the middle.
+      const poly = [];
+      const N = 10;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const along = (-0.5 + t) * LEAF_R * 1.4;
+        const w = Math.sin(Math.PI * t) * LEAF_R * 0.4;
+        poly.push([
+          lcx + pux*along + pwx*w,
+          lcy + puy*along + pwy*w,
+          lcz + puz*along + pwz*w,
+        ]);
+      }
+      for (let i = N - 1; i >= 1; i--) {
+        const t = i / N;
+        const along = (-0.5 + t) * LEAF_R * 1.4;
+        const w = Math.sin(Math.PI * t) * LEAF_R * 0.4;
+        poly.push([
+          lcx + pux*along - pwx*w,
+          lcy + puy*along - pwy*w,
+          lcz + puz*along - pwz*w,
+        ]);
+      }
+      lvs.push(poly);
+    }
+  }
+
+  // foliage filter: keep leaves either in the upper canopy OR near a branch tip.
+  // Tips at any Y get leaves; lower interior leaves are pruned.
+  const yMin = bb[1], yMax = bb[4];
+  const yCutoff = yMin + (yMax - yMin) * 0.55;
+  const tips = [];
+  for (const seg of segs) if (seg.children.length === 0) tips.push(seg.p1);
+  const tipR2 = (STEP_F * 2.5) * (STEP_F * 2.5);
+  const nearTip = (p) => {
+    for (const t of tips) {
+      const dx = p[0]-t[0], dy = p[1]-t[1], dz = p[2]-t[2];
+      if (dx*dx + dy*dy + dz*dz < tipR2) return true;
+    }
+    return false;
+  };
+  const LEAF_SCALE = 1.2;
+  const canopy = [];
+  let kept = 0;
+  for (const poly of lvs) {
+    let cx2 = 0, cy2 = 0, cz2 = 0;
+    for (const p of poly) { cx2 += p[0]; cy2 += p[1]; cz2 += p[2]; }
+    cx2 /= poly.length; cy2 /= poly.length; cz2 /= poly.length;
+    if (cy2 < yCutoff && !nearTip([cx2, cy2, cz2])) continue;
+    // thin foliage: keep ~1 in 3
+    kept++;
+    if (kept % 3 !== 0) continue;
+    const scaled = poly.map(p => [
+      cx2 + (p[0]-cx2)*LEAF_SCALE,
+      cy2 + (p[1]-cy2)*LEAF_SCALE,
+      cz2 + (p[2]-cz2)*LEAF_SCALE,
+    ]);
+    canopy.push(scaled);
+  }
+  lvs.length = 0;
+  for (const poly of canopy) lvs.push(poly);
+
+  const trunkR = r * 0.012;
+  const tipR = r * 0.0008;
+  for (const seg of segs) {
+    const ratio = seg.thick / maxThick;
+    seg.r_start = tipR + (trunkR - tipR) * ratio;
+    const childThick = seg.children.length > 0
+      ? Math.max(...seg.children.map(c => segs[c].thick))
+      : seg.thick * 0.7;
+    const cratio = childThick / maxThick;
+    seg.r_end = tipR + (trunkR - tipR) * cratio;
+    seg.c0 = [seg.p0[0]-cx, -(seg.p0[1]-cy), seg.p0[2]-cz];
+    seg.c1 = [seg.p1[0]-cx, -(seg.p1[1]-cy), seg.p1[2]-cz];
+  }
+  const mappedLeaves = lvs.map(poly => poly.map(p => [p[0]-cx, -(p[1]-cy), p[2]-cz]));
+
+  sceneRadius = r;
+  return { segs, leaves: mappedLeaves };
+}
+
+function regenerate() {
+  const toks = expand(params.N);
+  const result = buildScene(toks);
+  segments = result.segs;
+  leaves = result.leaves;
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  setAttributes('antialias', true);
+  perspective(PI/3, width/height, 1, 1e6);
+  cam = createCamera();
+  const bind = (id, fmt) => {
+    const inp = document.getElementById(id);
+    const val = document.getElementById(id+'v');
+    val.textContent = fmt(inp.value);
+    inp.addEventListener('input', () => {
+      params[id] = +inp.value;
+      val.textContent = fmt(inp.value);
+      regenerate();
+      placeCamera();
+    });
+  };
+  bind('N',     v => String(v|0));
+  bind('DELTA', v => (+v).toFixed(1));
+  regenerate();
+  placeCamera();
+}
+
+function placeCamera() {
+  const d = sceneRadius * 2.6;
+  cam.setPosition(0, 0, d);
+  cam.lookAt(0, 0, 0);
+  cam.upX = 0; cam.upY = 1; cam.upZ = 0;
+}
+
+function frustumMesh(r0, r1, h, sides) {
+  const a = TWO_PI / sides;
+  beginShape(TRIANGLE_STRIP);
+  for (let i = 0; i <= sides; i++) {
+    const c = Math.cos(i*a), s = Math.sin(i*a);
+    normal(c, 0, s);
+    vertex(r0*c, -h/2, r0*s);
+    vertex(r1*c,  h/2, r1*s);
+  }
+  endShape();
+}
+
+function drawSegment(seg) {
+  const dx = seg.c1[0]-seg.c0[0];
+  const dy = seg.c1[1]-seg.c0[1];
+  const dz = seg.c1[2]-seg.c0[2];
+  const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+  if (len < 1e-9) return;
+
+  const vx = dx/len, vy = dy/len, vz = dz/len;
+  let ux, uy, uz;
+  if (Math.abs(vx) < 0.9) { ux = 1; uy = 0; uz = 0; }
+  else                    { ux = 0; uy = 0; uz = 1; }
+  const dot = ux*vx + uy*vy + uz*vz;
+  ux -= dot*vx; uy -= dot*vy; uz -= dot*vz;
+  const ul = Math.sqrt(ux*ux+uy*uy+uz*uz); ux/=ul; uy/=ul; uz/=ul;
+  const wx = vy*uz - vz*uy, wy = vz*ux - vx*uz, wz = vx*uy - vy*ux;
+
+  const mx = (seg.c0[0]+seg.c1[0])/2;
+  const my = (seg.c0[1]+seg.c1[1])/2;
+  const mz = (seg.c0[2]+seg.c1[2])/2;
+
+  push();
+  applyMatrix(
+    ux, uy, uz, 0,
+    vx, vy, vz, 0,
+    wx, wy, wz, 0,
+    mx, my, mz, 1
+  );
+  const sides = seg.r_start * 30 / sceneRadius > 0.6 ? 8 : 5;
+  frustumMesh(seg.r_start, seg.r_end, len, sides);
+  pop();
+}
+
+function drawLeaf(poly) {
+  let cx = 0, cy = 0, cz = 0;
+  for (const p of poly) { cx += p[0]; cy += p[1]; cz += p[2]; }
+  cx /= poly.length; cy /= poly.length; cz /= poly.length;
+  const ax = poly[0][0]-cx, ay = poly[0][1]-cy, az = poly[0][2]-cz;
+  const bx = poly[1][0]-cx, by = poly[1][1]-cy, bz = poly[1][2]-cz;
+  let nx = ay*bz - az*by, ny = az*bx - ax*bz, nz = ax*by - ay*bx;
+  const nl = Math.sqrt(nx*nx+ny*ny+nz*nz) || 1;
+  nx/=nl; ny/=nl; nz/=nl;
+  beginShape(TRIANGLE_FAN);
+  normal(nx, ny, nz);
+  vertex(cx, cy, cz);
+  for (const p of poly) vertex(p[0], p[1], p[2]);
+  vertex(poly[0][0], poly[0][1], poly[0][2]);
+  endShape();
+}
+
+function draw() {
+  background(244, 241, 234);
+  orbitControl(2, 2, 0.1);
+
+  ambientLight(110, 110, 100);
+  directionalLight(220, 220, 200, -0.4, 0.7, -0.6);
+  directionalLight(80, 80, 75, 0.6, 0.4, 0.5);
+
+  noStroke();
+  ambientMaterial(70, 50, 38);
+  for (const seg of segments) drawSegment(seg);
+
+  ambientMaterial(40, 110, 45);
+  for (const leaf of leaves) drawLeaf(leaf);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  perspective(PI/3, width/height, 1, 1e6);
+  placeCamera();
+}
+</script>
+</body>
+</html>

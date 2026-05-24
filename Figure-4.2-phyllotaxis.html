@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Vogel's phyllotaxis model (figure 3.1)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #f4f1ea; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 300px; z-index: 10;
+    }
+    #panel h3 { margin: 0 0 8px; font-size: 14px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .row label { width: 60px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row .val { width: 60px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 12px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+    #hint { position: fixed; bottom: 10px; left: 12px; color:#666; font-size:12px; z-index:10; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 4.2 — Vogel's phyllotaxis</h3>
+  <div class="row"><label>α°</label><input type="range" id="A" min="130" max="145" step="0.01" value="137.5"><span class="val" id="Av">137.50</span></div>
+  <div class="row"><label>N</label><input type="range" id="N" min="50" max="2000" step="1" value="600"><span class="val" id="Nv">600</span></div>
+  <div class="row"><label>c</label><input type="range" id="C" min="2" max="20" step="0.1" value="6"><span class="val" id="Cv">6.0</span></div>
+  <div class="row"><label>dot</label><input type="range" id="D" min="1" max="12" step="0.1" value="4"><span class="val" id="Dv">4.0</span></div>
+  <div class="presets">
+    presets:
+    <button data-p="a">137.3°</button>
+    <button data-p="b">137.5°</button>
+    <button data-p="c">137.6°</button>
+    <button data-p="d">99.5°</button>
+  </div>
+</div>
+<div id="hint">Vogel's model: φ = n·α, r = c·√n</div>
+<script>
+const PRESETS = {
+  a: { A:137.3, N:600, C:6,   D:4 },
+  b: { A:137.5, N:600, C:6,   D:4 },
+  c: { A:137.6, N:600, C:6,   D:4 },
+  d: { A:99.5,  N:600, C:6,   D:4 },
+};
+
+let P = { ...PRESETS.b };
+const RAD = Math.PI / 180;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noStroke();
+
+  const fmt = {
+    A: v => (+v).toFixed(2),
+    N: v => String(v|0),
+    C: v => (+v).toFixed(1),
+    D: v => (+v).toFixed(1),
+  };
+
+  for (const id of ['A','N','C','D']) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    v.textContent = fmt[id](input.value);
+    input.addEventListener('input', () => {
+      P[id] = +input.value;
+      v.textContent = fmt[id](input.value);
+      clearActivePreset();
+      redraw();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  applyPreset('b');
+  noLoop();
+}
+
+function clearActivePreset() {
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  const fmt = {
+    A: v => (+v).toFixed(2),
+    N: v => String(v|0),
+    C: v => (+v).toFixed(1),
+    D: v => (+v).toFixed(1),
+  };
+  for (const k of Object.keys(p)) {
+    P[k] = p[k];
+    const inp = document.getElementById(k);
+    if (inp) {
+      inp.value = p[k];
+      const v = document.getElementById(k+'v');
+      if (v) v.textContent = fmt[k](p[k]);
+    }
+  }
+  clearActivePreset();
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  redraw();
+}
+
+function draw() {
+  background(244, 241, 234);
+  translate(width/2, height/2);
+
+  const N = P.N | 0;
+  const alpha = P.A * RAD;
+  const c = P.C;
+  const dot = P.D;
+
+  for (let n = 1; n <= N; n++) {
+    const phi = n * alpha;
+    const r = c * Math.sqrt(n);
+    const x = r * Math.cos(phi);
+    const y = r * Math.sin(phi);
+    const t = n / N;
+    const rcol = lerp(220, 90,  t);
+    const gcol = lerp(180, 50,  t);
+    const bcol = lerp(120, 30,  t);
+    fill(rcol, gcol, bcol);
+    circle(x, y, dot);
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cordate leaf development (figure 5.5)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 240px; z-index: 10;
+    }
+    #panel h3 { margin: 0 0 6px; font-size: 14px; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; font-family: monospace; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .row label { width: 64px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row .val { width: 44px; text-align: right; font-family: monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 5.5 — cordate leaf</h3>
+  <div class="sub">ω: [A][B]<br>A → [+A{.].C.}<br>B → [-B{.].C.}<br>C → GC</div>
+  <div class="row"><label>δ°</label><input type="range" id="DELTA" min="2" max="45" step="1" value="16"><span class="val" id="DELTAv">16</span></div>
+  <div class="row"><label>max n</label><input type="range" id="NMAX" min="1" max="20" step="1" value="10"><span class="val" id="NMAXv">10</span></div>
+  <div class="row"><label>per row</label><input type="range" id="PERROW" min="1" max="10" step="1" value="7"><span class="val" id="PERROWv">7</span></div>
+</div>
+<script>
+const RULES = {
+  'A': '[+A{.].C.}',
+  'B': '[-B{.].C.}',
+  'C': 'GC',
+};
+
+let params = { DELTA: 16, NMAX: 10, PERROW: 7 };
+let stages = [];
+
+function expand(axiom, n) {
+  let s = axiom;
+  for (let i = 0; i < n; i++) {
+    let next = '';
+    for (const c of s) next += RULES[c] ?? c;
+    s = next;
+  }
+  return s;
+}
+
+function buildLeaf(s, angDeg) {
+  const ang = angDeg * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stateStack = [];
+  const polyStack = [];
+  let polygon = null;
+  const polygons = [];
+
+  for (const c of s) {
+    switch (c) {
+      case 'F':
+      case 'G':
+        x += Math.cos(h);
+        y += Math.sin(h);
+        break;
+      case '+': h -= ang; break;
+      case '-': h += ang; break;
+      case '[': stateStack.push({ x, y, h }); break;
+      case ']': {
+        const st = stateStack.pop();
+        x = st.x; y = st.y; h = st.h;
+        break;
+      }
+      case '{':
+        polyStack.push(polygon);
+        polygon = [];
+        break;
+      case '}':
+        if (polygon && polygon.length >= 3) polygons.push(polygon);
+        polygon = polyStack.pop() || null;
+        break;
+      case '.':
+        if (polygon) polygon.push([x, y]);
+        break;
+    }
+  }
+
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  for (const p of polygons) for (const [px, py] of p) {
+    if (px < bb.minX) bb.minX = px;
+    if (px > bb.maxX) bb.maxX = px;
+    if (py < bb.minY) bb.minY = py;
+    if (py > bb.maxY) bb.maxY = py;
+  }
+  return { polygons, bb };
+}
+
+function regenerate() {
+  stages = [];
+  for (let n = 1; n <= params.NMAX; n++) {
+    const st = { n, ...buildLeaf(expand('[A][B]', n), params.DELTA) };
+    st.w = Math.max(st.bb.maxX - st.bb.minX, 0.05);
+    st.h = Math.max(st.bb.maxY - st.bb.minY, 0.05);
+    stages.push(st);
+  }
+  redraw();
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  for (const id of ['DELTA','NMAX','PERROW']) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    v.textContent = input.value;
+    input.addEventListener('input', () => {
+      params[id] = +input.value;
+      v.textContent = input.value;
+      regenerate();
+    });
+  }
+  regenerate();
+}
+
+function draw() {
+  background(250);
+  textAlign(CENTER, BOTTOM);
+  textSize(13);
+
+  const N = stages.length;
+  if (N === 0) return;
+
+  const cols = Math.min(params.PERROW, N);
+  const rows = Math.ceil(N / cols);
+  const padLeftUI = 280, padTop = 16, labelH = 26, gap = 24, sidePad = 16;
+  const drawW = width - padLeftUI;
+  const rowH = (height - padTop) / rows;
+  const cellInnerH = rowH - labelH;
+
+  const rowSums = [];
+  let maxLeafH = 0;
+  for (let r = 0; r < rows; r++) {
+    let s = 0;
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (i >= N) break;
+      s += stages[i].w;
+      if (stages[i].h > maxLeafH) maxLeafH = stages[i].h;
+    }
+    rowSums.push(s);
+  }
+  const maxRowSum = Math.max(...rowSums);
+
+  const sc = Math.min(
+    cellInnerH / maxLeafH,
+    (drawW - 2 * sidePad - (cols - 1) * gap) / maxRowSum
+  );
+
+  for (let r = 0; r < rows; r++) {
+    const itemsInRow = Math.min(cols, N - r * cols);
+    const rowWidth = rowSums[r] * sc + (itemsInRow - 1) * gap;
+    let xCursor = padLeftUI + (drawW - rowWidth) / 2;
+    const cy = padTop + r * rowH + cellInnerH / 2;
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (i >= N) break;
+      const st = stages[i];
+      const cellW = st.w * sc;
+      const cx = xCursor + cellW / 2;
+      const ox = cx - ((st.bb.minX + st.bb.maxX) / 2) * sc;
+      const oy = cy - ((st.bb.minY + st.bb.maxY) / 2) * sc;
+
+      stroke(20);
+      strokeWeight(0.6);
+      strokeJoin(ROUND);
+      noFill();
+      for (const poly of st.polygons) {
+        beginShape();
+        for (const [px, py] of poly) vertex(ox + px*sc, oy + py*sc);
+        endShape(CLOSE);
+      }
+
+      noStroke();
+      fill(60);
+      text(`n=${st.n}`, cx, padTop + r * rowH + rowH - 4);
+
+      xCursor += cellW + gap;
+    }
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>

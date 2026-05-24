@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ternary-branching trees with tropism (figure 2.8)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #f4f1ea; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 320px; z-index: 10;
+    }
+    #panel h3 { margin: 0 0 8px; font-size: 14px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .row label { width: 60px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row .val { width: 56px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 12px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+    #hint { position: fixed; bottom: 10px; left: 12px; color:#666; font-size:12px; z-index:10; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Figure 2.8 — ternary tree with tropism</h3>
+  <div class="row"><label>n</label><input  type="range" id="N"   min="1"   max="10"   step="1"    value="6"><span class="val" id="Nv">6</span></div>
+  <div class="row"><label>d₁°</label><input type="range" id="D1"  min="0"   max="360"  step="0.01" value="94.74"><span class="val" id="D1v">94.74</span></div>
+  <div class="row"><label>d₂°</label><input type="range" id="D2"  min="0"   max="360"  step="0.01" value="132.63"><span class="val" id="D2v">132.63</span></div>
+  <div class="row"><label>a°</label><input  type="range" id="A"   min="0"   max="90"   step="0.01" value="18.95"><span class="val" id="Av">18.95</span></div>
+  <div class="row"><label>lr</label><input  type="range" id="LR"  min="1.0" max="2.0"  step="0.001" value="1.109"><span class="val" id="LRv">1.109</span></div>
+  <div class="row"><label>e</label><input   type="range" id="E"   min="0"   max="1.0"  step="0.01" value="0.22"><span class="val" id="Ev">0.22</span></div>
+  <div class="row"><label>Tx</label><input  type="range" id="TX"  min="-1"  max="1"    step="0.01" value="0"><span class="val" id="TXv">0.00</span></div>
+  <div class="row"><label>Ty</label><input  type="range" id="TY"  min="-1"  max="1"    step="0.01" value="-1"><span class="val" id="TYv">-1.00</span></div>
+  <div class="row"><label>Tz</label><input  type="range" id="TZ"  min="-1"  max="1"    step="0.01" value="0"><span class="val" id="TZv">0.00</span></div>
+  <div class="presets">
+    presets:
+    <button data-p="a">a</button>
+    <button data-p="b">b</button>
+    <button data-p="c">c</button>
+    <button data-p="d">d</button>
+  </div>
+</div>
+<div id="hint">drag to orbit · scroll to zoom</div>
+<script>
+const PRESETS = {
+  a: { N:6, D1: 94.74, D2:132.63, A:18.95, LR:1.109, TX: 0.00, TY:-1.00, TZ: 0.00, E:0.22 },
+  b: { N:8, D1:137.50, D2:137.50, A:18.95, LR:1.109, TX: 0.00, TY:-1.00, TZ: 0.00, E:0.14 },
+  c: { N:8, D1:112.50, D2:157.50, A:22.50, LR:1.790, TX:-0.02, TY:-1.00, TZ: 0.00, E:0.27 },
+  d: { N:6, D1:180.00, D2:252.00, A:36.00, LR:1.070, TX:-0.61, TY: 0.77, TZ:-0.19, E:0.40 },
+};
+
+let P = { ...PRESETS.a };
+const VR = 1.732;
+const RAD = Math.PI / 180;
+
+let segments = [];
+let sceneRadius = 1;
+
+function expand(n) {
+  let toks = [
+    {t:'!', a:1},
+    {t:'F', a:200},
+    {t:'/', a:45},
+    {t:'A'}
+  ];
+  for (let i = 0; i < n; i++) {
+    const next = [];
+    for (const tok of toks) {
+      if (tok.t === 'A') {
+        next.push(
+          {t:'!', a:VR},
+          {t:'F', a:50},
+          {t:'['}, {t:'&', a:P.A}, {t:'F', a:50}, {t:'A'}, {t:']'},
+          {t:'/', a:P.D1},
+          {t:'['}, {t:'&', a:P.A}, {t:'F', a:50}, {t:'A'}, {t:']'},
+          {t:'/', a:P.D2},
+          {t:'['}, {t:'&', a:P.A}, {t:'F', a:50}, {t:'A'}, {t:']'}
+        );
+      } else if (tok.t === 'F') {
+        next.push({t:'F', a: tok.a * P.LR});
+      } else if (tok.t === '!') {
+        next.push({t:'!', a: tok.a * VR});
+      } else {
+        next.push(tok);
+      }
+    }
+    toks = next;
+  }
+  return toks;
+}
+
+function rot3(v, k, ang) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const d = k[0]*v[0] + k[1]*v[1] + k[2]*v[2];
+  return [
+    v[0]*c + (k[1]*v[2] - k[2]*v[1])*s + k[0]*d*(1-c),
+    v[1]*c + (k[2]*v[0] - k[0]*v[2])*s + k[1]*d*(1-c),
+    v[2]*c + (k[0]*v[1] - k[1]*v[0])*s + k[2]*d*(1-c)
+  ];
+}
+
+function applyTropism(H, L, U) {
+  const T = [P.TX, P.TY, P.TZ];
+  const cx = H[1]*T[2] - H[2]*T[1];
+  const cy = H[2]*T[0] - H[0]*T[2];
+  const cz = H[0]*T[1] - H[1]*T[0];
+  const cm = Math.sqrt(cx*cx + cy*cy + cz*cz);
+  if (cm < 1e-9) return [H, L, U];
+  const ax = [cx/cm, cy/cm, cz/cm];
+  const ang = P.E * cm;
+  return [rot3(H, ax, ang), rot3(L, ax, ang), rot3(U, ax, ang)];
+}
+
+function buildSegments(tokens) {
+  let H = [0, 1, 0], L = [-1, 0, 0], U = [0, 0, 1];
+  let pos = [0, 0, 0];
+  let w = 1;
+  let parent = -1;
+  const stack = [];
+  const segs = [];
+
+  for (const tok of tokens) {
+    switch (tok.t) {
+      case 'F': {
+        const p0 = [...pos];
+        pos = [pos[0]+tok.a*H[0], pos[1]+tok.a*H[1], pos[2]+tok.a*H[2]];
+        const idx = segs.length;
+        segs.push({ p0, p1: [...pos], w, parent, children: [] });
+        if (parent >= 0) segs[parent].children.push(idx);
+        parent = idx;
+        [H, L, U] = applyTropism(H, L, U);
+        break;
+      }
+      case '!': w = tok.a; break;
+      case '+': { const a =  tok.a*RAD; H = rot3(H,U,a); L = rot3(L,U,a); break; }
+      case '-': { const a = -tok.a*RAD; H = rot3(H,U,a); L = rot3(L,U,a); break; }
+      case '&': { const a =  tok.a*RAD; H = rot3(H,L,a); U = rot3(U,L,a); break; }
+      case '^': { const a = -tok.a*RAD; H = rot3(H,L,a); U = rot3(U,L,a); break; }
+      case '/': { const a =  tok.a*RAD; L = rot3(L,H,a); U = rot3(U,H,a); break; }
+      case '\\':{ const a = -tok.a*RAD; L = rot3(L,H,a); U = rot3(U,H,a); break; }
+      case '[': stack.push({H:[...H], L:[...L], U:[...U], pos:[...pos], w, parent}); break;
+      case ']': { const s = stack.pop(); H=s.H; L=s.L; U=s.U; pos=s.pos; w=s.w; parent=s.parent; break; }
+    }
+  }
+
+  let maxW = 0;
+  for (const seg of segs) {
+    seg.w_start = seg.w;
+    seg.w_end = seg.children.length > 0
+      ? Math.max(...seg.children.map(c => segs[c].w))
+      : seg.w * 0.6;
+    if (seg.w_start > maxW) maxW = seg.w_start;
+  }
+
+  const bb = [Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity];
+  for (const seg of segs) {
+    for (const p of [seg.p0, seg.p1]) {
+      if (p[0]<bb[0]) bb[0]=p[0]; if (p[1]<bb[1]) bb[1]=p[1]; if (p[2]<bb[2]) bb[2]=p[2];
+      if (p[0]>bb[3]) bb[3]=p[0]; if (p[1]>bb[4]) bb[4]=p[1]; if (p[2]>bb[5]) bb[5]=p[2];
+    }
+  }
+  const cx = (bb[0]+bb[3])/2, cy = (bb[1]+bb[4])/2, cz = (bb[2]+bb[5])/2;
+  const r = Math.max(bb[3]-bb[0], bb[4]-bb[1], bb[5]-bb[2]) / 2;
+
+  const wBase = r * 0.012;
+  for (const seg of segs) {
+    seg.r_start = (seg.w_start / maxW) * wBase * 6;
+    seg.r_end   = (seg.w_end   / maxW) * wBase * 6;
+    seg.c0 = [seg.p0[0]-cx, -(seg.p0[1]-cy), seg.p0[2]-cz];
+    seg.c1 = [seg.p1[0]-cx, -(seg.p1[1]-cy), seg.p1[2]-cz];
+  }
+
+  sceneRadius = r;
+  return segs;
+}
+
+function regenerate() {
+  segments = buildSegments(expand(P.N));
+}
+
+let cam;
+let orbitEnabled = true;
+const FMT = {
+  N:  v => String(v|0),
+  D1: v => (+v).toFixed(2),
+  D2: v => (+v).toFixed(2),
+  A:  v => (+v).toFixed(2),
+  LR: v => (+v).toFixed(3),
+  E:  v => (+v).toFixed(2),
+  TX: v => (+v).toFixed(2),
+  TY: v => (+v).toFixed(2),
+  TZ: v => (+v).toFixed(2),
+};
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  setAttributes('antialias', true);
+  perspective(PI/3, width/height, 1, 1e6);
+  cam = createCamera();
+
+  for (const id of Object.keys(FMT)) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    v.textContent = FMT[id](input.value);
+    input.addEventListener('input', () => {
+      P[id] = +input.value;
+      v.textContent = FMT[id](input.value);
+      clearActivePreset();
+      regenerate();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  const panel = document.getElementById('panel');
+  panel.addEventListener('pointerenter', () => { orbitEnabled = false; });
+  panel.addEventListener('pointerleave', () => { orbitEnabled = true; });
+  applyPreset('a');
+}
+
+function clearActivePreset() {
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  for (const k of Object.keys(p)) {
+    P[k] = p[k];
+    const inp = document.getElementById(k);
+    if (inp) {
+      inp.value = p[k];
+      const v = document.getElementById(k+'v');
+      if (v) v.textContent = FMT[k](p[k]);
+    }
+  }
+  clearActivePreset();
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  regenerate();
+  placeCamera();
+  orbitEnabled = true;
+}
+
+function placeCamera() {
+  const d = sceneRadius * 2.6;
+  cam.setPosition(0, 0, d);
+  cam.lookAt(0, 0, 0);
+  cam.upX = 0; cam.upY = 1; cam.upZ = 0;
+}
+
+function frustumMesh(r0, r1, h, sides) {
+  const a = TWO_PI / sides;
+  beginShape(TRIANGLE_STRIP);
+  for (let i = 0; i <= sides; i++) {
+    const c = Math.cos(i*a), s = Math.sin(i*a);
+    normal(c, 0, s);
+    vertex(r0*c, -h/2, r0*s);
+    vertex(r1*c,  h/2, r1*s);
+  }
+  endShape();
+}
+
+function drawSegment(seg) {
+  const dx = seg.c1[0]-seg.c0[0];
+  const dy = seg.c1[1]-seg.c0[1];
+  const dz = seg.c1[2]-seg.c0[2];
+  const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+  if (len < 1e-9) return;
+
+  const vx = dx/len, vy = dy/len, vz = dz/len;
+  let ux, uy, uz;
+  if (Math.abs(vx) < 0.9) { ux = 1; uy = 0; uz = 0; }
+  else                    { ux = 0; uy = 0; uz = 1; }
+  const dot = ux*vx + uy*vy + uz*vz;
+  ux -= dot*vx; uy -= dot*vy; uz -= dot*vz;
+  const ul = Math.sqrt(ux*ux+uy*uy+uz*uz); ux/=ul; uy/=ul; uz/=ul;
+  const wx = vy*uz - vz*uy, wy = vz*ux - vx*uz, wz = vx*uy - vy*ux;
+
+  const mx = (seg.c0[0]+seg.c1[0])/2;
+  const my = (seg.c0[1]+seg.c1[1])/2;
+  const mz = (seg.c0[2]+seg.c1[2])/2;
+
+  push();
+  applyMatrix(
+    ux, uy, uz, 0,
+    vx, vy, vz, 0,
+    wx, wy, wz, 0,
+    mx, my, mz, 1
+  );
+  const sides = seg.r_start * 30 / sceneRadius > 0.6 ? 10 : 6;
+  frustumMesh(seg.r_start, seg.r_end, len, sides);
+  pop();
+}
+
+function draw() {
+  background(244, 241, 234);
+  if (orbitEnabled) orbitControl(2, 2, 0.1);
+
+  ambientLight(110, 100, 92);
+  directionalLight(220, 210, 195, -0.4, 0.7, -0.6);
+  directionalLight(80, 75, 70, 0.6, 0.4, 0.5);
+
+  ambientMaterial(70, 50, 38);
+  noStroke();
+
+  for (const seg of segments) drawSegment(seg);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  perspective(PI/3, width/height, 1, 1e6);
+  placeCamera();
+}
+</script>
+</body>
+</html>
