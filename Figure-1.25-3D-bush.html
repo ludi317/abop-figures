@@ -32,6 +32,7 @@ let segments = [];
 let leaves = [];
 let sceneRadius = 1;
 let cam;
+let orbitEnabled = true;
 
 function expand(n) {
   let toks = [{t:'A'}];
@@ -307,11 +308,13 @@ function setup() {
       params[id] = +inp.value;
       val.textContent = fmt(inp.value);
       regenerate();
-      placeCamera();
     });
   };
   bind('N',     v => String(v|0));
   bind('DELTA', v => (+v).toFixed(1));
+  const ui = document.getElementById('ui');
+  ui.addEventListener('pointerenter', () => { orbitEnabled = false; });
+  ui.addEventListener('pointerleave', () => { orbitEnabled = true; });
   regenerate();
   placeCamera();
 }
@@ -386,7 +389,7 @@ function drawLeaf(poly) {
 
 function draw() {
   background(244, 241, 234);
-  orbitControl(2, 2, 0.1);
+  if (orbitEnabled) orbitControl(2, 2, 0.1);
 
   ambientLight(110, 110, 100);
   directionalLight(220, 220, 200, -0.4, 0.7, -0.6);
