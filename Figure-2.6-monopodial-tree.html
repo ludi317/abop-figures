@@ -204,7 +204,9 @@ function regenerate() {
 }
 
 let cam;
-let orbitEnabled = true;
+let pointerOnPanel = false;
+let panelDragging = false;
+function orbitEnabled() { return !pointerOnPanel && !panelDragging; }
 
 function setup() {
   createCanvas(windowWidth, windowHeight, WEBGL);
@@ -237,8 +239,11 @@ function setup() {
     btn.addEventListener('click', () => applyPreset(btn.dataset.p));
   }
   const panel = document.getElementById('panel');
-  panel.addEventListener('pointerenter', () => { orbitEnabled = false; });
-  panel.addEventListener('pointerleave', () => { orbitEnabled = true; });
+  panel.addEventListener('pointerenter', () => { pointerOnPanel = true; });
+  panel.addEventListener('pointerleave', () => { pointerOnPanel = false; });
+  panel.addEventListener('pointerdown', () => { panelDragging = true; });
+  window.addEventListener('pointerup',   () => { panelDragging = false; });
+  panel.addEventListener('wheel', (e) => e.stopPropagation());
   applyPreset('a');
 }
 
@@ -270,7 +275,6 @@ function applyPreset(key) {
   document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
   regenerate();
   placeCamera();
-  orbitEnabled = true;
 }
 
 function placeCamera() {
@@ -326,7 +330,7 @@ function drawSegment(seg) {
 
 function draw() {
   background(244, 241, 234);
-  if (orbitEnabled) orbitControl(2, 2, 0.1);
+  if (orbitEnabled()) orbitControl(2, 2, 0.1);
 
   ambientLight(110, 100, 92);
   directionalLight(220, 210, 195, -0.4, 0.7, -0.6);

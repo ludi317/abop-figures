@@ -56,7 +56,9 @@ const PRESETS = {
 
 let P = { ...PRESETS.pineapple };
 const RAD = Math.PI / 180;
-let orbitEnabled = true;
+let pointerOnPanel = false;
+let panelDragging = false;
+function orbitEnabled() { return !pointerOnPanel && !panelDragging; }
 
 function setup() {
   createCanvas(windowWidth, windowHeight, WEBGL);
@@ -86,8 +88,11 @@ function setup() {
     btn.addEventListener('click', () => applyPreset(btn.dataset.p));
   }
   const panel = document.getElementById('panel');
-  panel.addEventListener('pointerenter', () => { orbitEnabled = false; });
-  panel.addEventListener('pointerleave', () => { orbitEnabled = true; });
+  panel.addEventListener('pointerenter', () => { pointerOnPanel = true; });
+  panel.addEventListener('pointerleave', () => { pointerOnPanel = false; });
+  panel.addEventListener('pointerdown', () => { panelDragging = true; });
+  window.addEventListener('pointerup',   () => { panelDragging = false; });
+  panel.addEventListener('wheel', (e) => e.stopPropagation());
   applyPreset('pineapple');
 }
 
@@ -213,7 +218,7 @@ function drawLeaf(cx, cy, cz, dirX, dirY, dirZ, len, width, curl) {
 
 function draw() {
   background(244, 241, 234);
-  if (orbitEnabled) orbitControl(2, 2, 0.1);
+  if (orbitEnabled()) orbitControl(2, 2, 0.1);
 
   ambientLight(110, 105, 95);
   directionalLight(220, 210, 195, -0.4, 0.7, -0.6);
