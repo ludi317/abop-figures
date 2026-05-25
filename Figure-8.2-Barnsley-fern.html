@@ -7,16 +7,18 @@
   <style>
     body { margin: 0; background: #fafafa; font-family: sans-serif; }
     #title { position: fixed; top: 12px; left: 12px; background: rgba(255,255,255,0.92); padding: 8px 10px; border-radius: 6px; font-size: 13px; z-index:10; }
-    #ui { position: fixed; top: 50px; left: 12px; background: rgba(255,255,255,0.92); padding: 10px 12px; border-radius: 6px; font-size: 13px; z-index:10; }
+    #ui { position: fixed; top: 72px; left: 12px; background: rgba(255,255,255,0.92); padding: 10px 12px; border-radius: 6px; font-size: 13px; z-index:10; }
     #ui .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
     #ui label { width: 78px; font-family: monospace; font-size: 12px; }
     #ui input[type=range] { width: 140px; }
     #ui .val { width: 50px; text-align:right; font-family: monospace; font-size: 12px; }
     #ui button { margin-top: 6px; padding: 4px 10px; font-size: 12px; cursor:pointer; }
+    #rules { position: fixed; top: 36px; left: 12px; background: rgba(255,255,255,0.92); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #666; z-index:10; }
   </style>
 </head>
 <body>
 <div id="title">Figure 8.2 — Barnsley fern</div>
+<div id="rules">IFS: x′ = ax+by+e, y′ = cx+dy+f<br>4 affine transforms chosen by weighted random</div>
 <div id="ui">
   <div class="row"><label>points (M)</label><input type="range" id="N"     min="0.1" max="3"   step="0.1"  value="2.0"><span class="val" id="Nv">2.0</span></div>
   <div class="row"><label>tilt °</label>    <input type="range" id="TILT"  min="-45" max="45"  step="0.1"  value="2.7"><span class="val" id="TILTv">2.7</span></div>

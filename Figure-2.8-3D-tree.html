@@ -25,12 +25,14 @@
     }
     .presets button:hover { background: #e4e4e4; }
     .presets .active { background: #d0d8e8; border-color: #88a; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; font-family: monospace; }
     #hint { position: fixed; bottom: 10px; left: 12px; color:#666; font-size:12px; z-index:10; }
   </style>
 </head>
 <body>
 <div id="panel">
   <h3>Figure 2.8 — ternary tree with tropism</h3>
+  <div class="sub">ω: !(1)F(200)/(45)A<br>A → !(vr)F(50)[&amp;(a)F(50)A]/(d₁)[&amp;(a)F(50)A]/(d₂)[&amp;(a)F(50)A]<br>F(s) → F(s·lr) · !(w) → !(w·vr)</div>
   <div class="row"><label>n</label><input  type="range" id="N"   min="1"   max="10"   step="1"    value="6"><span class="val" id="Nv">6</span></div>
   <div class="row"><label>d₁°</label><input type="range" id="D1"  min="0"   max="360"  step="0.01" value="94.74"><span class="val" id="D1v">94.74</span></div>
   <div class="row"><label>d₂°</label><input type="range" id="D2"  min="0"   max="360"  step="0.01" value="132.63"><span class="val" id="D2v">132.63</span></div>

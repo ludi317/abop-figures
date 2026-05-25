@@ -25,12 +25,14 @@
     }
     .presets button:hover { background: #e4e4e4; }
     .presets .active { background: #d0d8e8; border-color: #88a; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; font-family: monospace; }
     #hint { position: fixed; bottom: 10px; left: 12px; color:#666; font-size:12px; z-index:10; }
   </style>
 </head>
 <body>
 <div id="panel">
   <h3>Figure 2.6 — Honda's monopodial trees</h3>
+  <div class="sub">ω: A(l,w)<br>A → !(w)F(l)[&amp;(a₀)B(l·r₂,w·wr)]/(δ)A(l·r₁,w·wr)<br>B → !(w)F(l)[−(a₂)$C(l·r₂,w·wr)]C(l·r₁,w·wr)<br>C → !(w)F(l)[+(a₂)$B(l·r₂,w·wr)]B(l·r₁,w·wr)</div>
   <div class="row"><label>n</label><input type="range" id="N"  min="1" max="12"   step="1"   value="10"><span class="val" id="Nv">10</span></div>
   <div class="row"><label>r₁</label><input type="range" id="R1" min="0.5" max="1.0"  step="0.01" value="0.9"><span class="val" id="R1v">0.90</span></div>
   <div class="row"><label>r₂</label><input type="range" id="R2" min="0.3" max="1.0"  step="0.01" value="0.6"><span class="val" id="R2v">0.60</span></div>

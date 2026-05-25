@@ -25,11 +25,13 @@
     }
     .presets button:hover { background: #e4e4e4; }
     .presets .active { background: #d0d8e8; border-color: #88a; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; font-family: monospace; }
   </style>
 </head>
 <body>
 <div id="panel">
   <h3>Figure 5.11 — compound leaves</h3>
+  <div class="sub">ω: A(0)<br>A(d) : d&gt;0 → A(d−1)<br>A(0) → F(1)[+A(D)][-A(D)]F(1)A(0)<br>F(a) → F(a·R)</div>
   <div class="row"><label>D</label><input  type="range" id="D" min="0" max="12"  step="1"    value="0"><span class="val" id="Dv">0</span></div>
   <div class="row"><label>R</label><input  type="range" id="R" min="1.0" max="2.5" step="0.01" value="2.00"><span class="val" id="Rv">2.00</span></div>
   <div class="row"><label>n</label><input  type="range" id="N" min="1" max="45"  step="1"    value="10"><span class="val" id="Nv">10</span></div>

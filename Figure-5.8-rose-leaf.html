@@ -8,7 +8,7 @@
     body { margin: 0; background: #fafafa; font-family: sans-serif; }
     #title { position: fixed; top: 12px; left: 12px; background: rgba(255,255,255,0.85); padding: 6px 10px; border-radius: 6px; font-size: 14px; z-index: 5; }
     #panel {
-      position: fixed; top: 56px; left: 12px;
+      position: fixed; top: 86px; left: 12px;
       background: rgba(255,255,255,0.92);
       padding: 10px 12px; border-radius: 6px;
       font-size: 12px; font-family: sans-serif;
@@ -31,10 +31,12 @@
       border-radius: 4px;
     }
     #panel .reset:hover { background: #e6e6e6; }
+    #rules { position: fixed; top: 36px; left: 12px; background: rgba(255,255,255,0.85); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #666; z-index: 5; }
   </style>
 </head>
 <body>
 <div id="title">Figure 5.8 — A rose leaf</div>
+<div id="rules">ω: [{A(0,R).}][{A(0,L).}]<br>A(t,d) → .G(LA,RA). [±B(t)G(LC,RC).}] [±B(t){.] A(t+1,d)<br>B(t):t&gt;0 → G(LB,RB) B(t−1) · G(s,r) → G(s·r, r)</div>
 <div id="panel"></div>
 <script>
 const PARAMS = [
