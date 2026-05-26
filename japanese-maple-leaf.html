@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Japanese maple leaf (palmate, after ch. 5)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <style>
+    body { margin: 0; background: #fafafa; font-family: sans-serif; overflow: hidden; }
+    #panel {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(255,255,255,0.94);
+      padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 13px; min-width: 300px; z-index: 10;
+    }
+    #panel h3 { margin: 0 0 6px; font-size: 14px; }
+    #panel .sub { color:#666; font-size: 11px; margin-bottom: 8px; font-family: monospace; line-height: 1.5; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .row label { width: 56px; font-family: monospace; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row .val { width: 48px; text-align: right; font-family: monospace; font-size: 12px; }
+    .presets { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .presets button {
+      margin: 2px; padding: 4px 10px; font-family: monospace;
+      background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
+    }
+    .presets button:hover { background: #e4e4e4; }
+    .presets .active { background: #d0d8e8; border-color: #88a; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h3>Japanese maple — palmate leaf</h3>
+  <div class="sub">ω: P · ∏<sub>i=−k..k</sub> [/(i·α) L<sup>n<sub>i</sub></sup>({.A(0)})]<br>A(t) → G(LA,RA)[-C(t).][-B(t).][A(t+1)][+B(t).][+C(t).]<br>B(t):t&gt;0 → G(LB,RB)B(t−PD) · C(t):t&gt;0 → G(LB·SR,RB)C(t−PD)<br>G(s,r) → G(s·r,r)</div>
+  <div class="row"><label>lobes</label><input type="range" id="LOBES" min="3" max="11" step="2" value="7"><span class="val" id="LOBESv">7</span></div>
+  <div class="row"><label>α°</label><input type="range" id="SPREAD" min="12" max="50" step="1" value="27"><span class="val" id="SPREADv">27</span></div>
+  <div class="row"><label>fall</label><input type="range" id="FALLOFF" min="0" max="6" step="0.5" value="2"><span class="val" id="FALLOFFv">2.0</span></div>
+  <div class="row"><label>n</label><input type="range" id="N" min="4" max="30" step="1" value="20"><span class="val" id="Nv">20</span></div>
+  <div class="row"><label>δ°</label><input type="range" id="DELTA" min="6" max="60" step="1" value="18"><span class="val" id="DELTAv">18</span></div>
+  <div class="row"><label>LA</label><input type="range" id="LA" min="1" max="10" step="0.1" value="5"><span class="val" id="LAv">5.0</span></div>
+  <div class="row"><label>RA</label><input type="range" id="RA" min="0.85" max="1.3" step="0.01" value="1.00"><span class="val" id="RAv">1.00</span></div>
+  <div class="row"><label>LB</label><input type="range" id="LB" min="0.1" max="6" step="0.1" value="1.0"><span class="val" id="LBv">1.0</span></div>
+  <div class="row"><label>RB</label><input type="range" id="RB" min="0.85" max="1.4" step="0.01" value="1.12"><span class="val" id="RBv">1.12</span></div>
+  <div class="row"><label>PD</label><input type="range" id="PD" min="0" max="3" step="0.05" value="1.00"><span class="val" id="PDv">1.00</span></div>
+  <div class="row"><label>SR</label><input type="range" id="SR" min="0.1" max="1.0" step="0.01" value="0.70"><span class="val" id="SRv">0.70</span></div>
+  <div class="row"><label>petiole</label><input type="range" id="PET" min="0" max="80" step="1" value="35"><span class="val" id="PETv">35</span></div>
+  <div class="presets">
+    variety:
+    <button data-p="a">dissectum</button>
+    <button data-p="b">palmatum</button>
+    <button data-p="c">atropurpureum</button>
+    <button data-p="d">linearilobum</button>
+    <button data-p="e">japonicum</button>
+  </div>
+</div>
+<script>
+const PRESETS = {
+  a: { LOBES:7, SPREAD:43, FALLOFF:2.0, N:20, DELTA:32, LA:4.5, RA:1.00, LB:0.9, RB:1.09, PD:0.60, SR:0.15, PET:30,
+       FILL:[98,32,42], EDGE:[55,16,24], VEIN:[180,120,130] },
+  b: { LOBES:7, SPREAD:33, FALLOFF:1.5, N:22, DELTA:42, LA:5.0, RA:0.98, LB:0.8,  RB:1.11, PD:0.50, SR:0.84, PET:24,
+       FILL:[196,30,22], EDGE:[120,12,10], VEIN:[235,130,100] },
+  c: { LOBES:7, SPREAD:30, FALLOFF:2.0, N:22, DELTA:30, LA:5.5, RA:0.97, LB:0.6, RB:1.10, PD:0.55, SR:0.90, PET:26,
+       FILL:[78,32,52],  EDGE:[42,16,30],  VEIN:[150,90,120] },
+  d: { LOBES:7, SPREAD:29, FALLOFF:1.5, N:26, DELTA:12, LA:5.5, RA:1.00, LB:0.6, RB:1.03, PD:0.35, SR:0.96, PET:32,
+       FILL:[72,28,42],  EDGE:[40,14,24],  VEIN:[140,80,100] },
+  e: { LOBES:11, SPREAD:19, FALLOFF:0.5, N:18, DELTA:50, LA:4.5, RA:1.02, LB:1.4, RB:1.12, PD:0.40, SR:0.78, PET:20,
+       FILL:[206,76,34], EDGE:[150,46,18], VEIN:[230,200,110] },
+};
+
+let P = { ...PRESETS.b };
+
+function expandLobe(n) {
+  let toks = [{t:'{'}, {t:'.'}, {t:'A', a:0}, {t:'}'}];
+  for (let step = 0; step < n; step++) {
+    const next = [];
+    for (const tok of toks) {
+      if (tok.t === 'A') {
+        next.push(
+          {t:'G', s:P.LA, r:P.RA, vein:1},
+          {t:'['}, {t:'-'}, {t:'C', a: tok.a}, {t:'.'}, {t:']'},
+          {t:'['}, {t:'-'}, {t:'B', a: tok.a}, {t:'.'}, {t:']'},
+          {t:'['}, {t:'A', a: tok.a + 1}, {t:']'},
+          {t:'['}, {t:'+'}, {t:'B', a: tok.a}, {t:'.'}, {t:']'},
+          {t:'['}, {t:'+'}, {t:'C', a: tok.a}, {t:'.'}, {t:']'},
+        );
+      } else if (tok.t === 'B' || tok.t === 'C') {
+        if (tok.a > 1e-9) {
+          const len = tok.t === 'B' ? P.LB : P.LB * P.SR;
+          next.push({t:'G', s:len, r:P.RB, vein:tok.t === 'B' ? 2 : 0}, {t:tok.t, a: tok.a - P.PD});
+        } else {
+          next.push(tok);
+        }
+      } else if (tok.t === 'G') {
+        next.push({t:'G', s: tok.s * tok.r, r: tok.r, vein: tok.vein});
+      } else {
+        next.push(tok);
+      }
+    }
+    toks = next;
+  }
+  return toks;
+}
+
+function expand() {
+  const half = (P.LOBES - 1) / 2;
+  const order = [];
+  for (let i = -half; i <= half; i++) order.push(i);
+  order.sort((a, b) => Math.abs(b) - Math.abs(a));
+  const toks = [{t:'G', s:P.PET, r:1, vein:1}];
+  for (const i of order) {
+    const n = Math.max(2, Math.round(P.N - Math.abs(i) * P.FALLOFF));
+    toks.push({t:'['}, {t:'/', a: i * P.SPREAD}, ...expandLobe(n), {t:']'});
+  }
+  return toks;
+}
+
+function build(toks) {
+  const dAng = P.DELTA * Math.PI / 180;
+  let x = 0, y = 0, h = -Math.PI / 2;
+  const stack = [];
+  const polyStack = [];
+  let polygon = null;
+  const polygons = [];
+  const veins = [];
+  const laterals = [];
+
+  for (const tok of toks) {
+    switch (tok.t) {
+      case 'G': {
+        const nx = x + tok.s * Math.cos(h);
+        const ny = y + tok.s * Math.sin(h);
+        if (tok.vein === 1) veins.push([[x, y], [nx, ny]]);
+        else if (tok.vein === 2) laterals.push([[x, y], [nx, ny]]);
+        x = nx; y = ny;
+        break;
+      }
+      case '+': h -= dAng; break;
+      case '-': h += dAng; break;
+      case '/': h += tok.a * Math.PI / 180; break;
+      case '[': stack.push({x, y, h}); break;
+      case ']': { const s = stack.pop(); x = s.x; y = s.y; h = s.h; break; }
+      case '{': polyStack.push(polygon); polygon = []; break;
+      case '}':
+        if (polygon && polygon.length >= 3) polygons.push(polygon);
+        polygon = polyStack.pop() || null;
+        break;
+      case '.': if (polygon) polygon.push([x, y]); break;
+    }
+  }
+
+  let bb = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
+  const visit = (px, py) => {
+    if (px < bb.minX) bb.minX = px; if (px > bb.maxX) bb.maxX = px;
+    if (py < bb.minY) bb.minY = py; if (py > bb.maxY) bb.maxY = py;
+  };
+  for (const p of polygons) for (const [px, py] of p) visit(px, py);
+  for (const [[ax,ay],[bx,by]] of veins) { visit(ax, ay); visit(bx, by); }
+  return { polygons, veins, laterals, bb };
+}
+
+let cached = null;
+
+function regenerate() {
+  cached = build(expand());
+  redraw();
+}
+
+const FMT = {
+  LOBES: v => String(v|0), SPREAD: v => String(v|0), FALLOFF: v => (+v).toFixed(1),
+  N: v => String(v|0), DELTA: v => String(v|0), PET: v => String(v|0),
+  LA: v => (+v).toFixed(1), RA: v => (+v).toFixed(2),
+  LB: v => (+v).toFixed(1), RB: v => (+v).toFixed(2),
+  PD: v => (+v).toFixed(2), SR: v => (+v).toFixed(2),
+};
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+  for (const id of Object.keys(FMT)) {
+    const input = document.getElementById(id);
+    const v = document.getElementById(id+'v');
+    v.textContent = FMT[id](input.value);
+    input.addEventListener('input', () => {
+      P[id] = +input.value;
+      v.textContent = FMT[id](input.value);
+      clearActivePreset();
+      regenerate();
+    });
+  }
+  for (const btn of document.querySelectorAll('.presets button')) {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.p));
+  }
+  applyPreset('b');
+}
+
+function clearActivePreset() {
+  for (const b of document.querySelectorAll('.presets button')) b.classList.remove('active');
+}
+
+function applyPreset(key) {
+  const p = PRESETS[key];
+  for (const k of Object.keys(p)) {
+    P[k] = p[k];
+    const inp = document.getElementById(k);
+    if (!inp) continue;
+    inp.value = p[k];
+    document.getElementById(k+'v').textContent = FMT[k](p[k]);
+  }
+  clearActivePreset();
+  document.querySelector(`.presets button[data-p="${key}"]`).classList.add('active');
+  regenerate();
+}
+
+function draw() {
+  background(250);
+  if (!cached) return;
+  const { polygons, veins, bb } = cached;
+  if (!isFinite(bb.minX)) return;
+  const w = bb.maxX - bb.minX, h = bb.maxY - bb.minY;
+  if (w <= 0 || h <= 0) return;
+
+  const padLeft = 360, padRight = 40, padTop = 30, padBot = 30;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBot;
+  const sc = Math.min(innerW / w, innerH / h);
+  const cx = padLeft + innerW / 2;
+  const cy = padTop + innerH / 2;
+  const ox = cx - ((bb.minX + bb.maxX) / 2) * sc;
+  const oy = cy - ((bb.minY + bb.maxY) / 2) * sc;
+
+  fill(...P.FILL);
+  stroke(...P.EDGE);
+  strokeWeight(1.0);
+  strokeJoin(ROUND);
+  for (const poly of polygons) {
+    beginShape();
+    for (const [px, py] of poly) vertex(ox + px*sc, oy + py*sc);
+    endShape(CLOSE);
+  }
+
+  stroke(...P.VEIN, 120);
+  strokeWeight(0.5);
+  noFill();
+  for (const [[ax,ay],[bx,by]] of cached.laterals) {
+    line(ox + ax*sc, oy + ay*sc, ox + bx*sc, oy + by*sc);
+  }
+
+  stroke(...P.VEIN);
+  strokeWeight(1.4);
+  for (const [[ax,ay],[bx,by]] of veins) {
+    line(ox + ax*sc, oy + ay*sc, ox + bx*sc, oy + by*sc);
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  redraw();
+}
+</script>
+</body>
+</html>
